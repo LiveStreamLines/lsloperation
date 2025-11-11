@@ -1,0 +1,171 @@
+<div class="flex min-h-screen bg-slate-100 text-slate-900">
+  <aside class="hidden w-72 flex-shrink-0 flex-col border-r border-slate-200 bg-white px-6 py-8 lg:flex">
+    <div class="flex items-center gap-3">
+      <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-600 text-lg font-bold text-white">
+        L
+      </div>
+      <div>
+        <p class="text-sm font-semibold text-slate-500">LSL Operation</p>
+        <p class="text-lg font-bold text-slate-900">Control Center</p>
+      </div>
+    </div>
+
+    <nav class="mt-10 space-y-1">
+      @for (item of navItems; track item.path) {
+        <a
+          [routerLink]="item.path"
+          routerLinkActive="bg-slate-900 text-white shadow-lg shadow-slate-900/20"
+          #rla="routerLinkActive"
+          class="group flex flex-col gap-1 rounded-2xl px-5 py-4 text-sm transition hover:bg-slate-900/5"
+        >
+          <span class="flex items-center justify-between">
+            <span class="font-semibold tracking-wide" [class.text-white]="rla.isActive">{{ item.label }}</span>
+            <span
+              class="h-2 w-2 rounded-full transition"
+              [class.bg-emerald-400]="rla.isActive"
+              [class.bg-slate-300]="!rla.isActive"
+            ></span>
+          </span>
+          <span class="text-xs text-slate-500 transition group-hover:text-slate-700" [class.text-slate-300]="rla.isActive">
+            {{ item.description }}
+          </span>
+        </a>
+      }
+    </nav>
+
+    <div class="mt-auto rounded-2xl bg-slate-900 px-5 py-6 text-white">
+      <p class="text-sm font-semibold uppercase tracking-wide text-white/60">System Health</p>
+      <div class="mt-4 space-y-3 text-sm">
+        <div class="flex items-center justify-between">
+          <span>Services</span>
+          <span class="font-semibold text-emerald-400">Operational</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>Cameras</span>
+          <span>1,247 / 1,280</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>Incidents</span>
+          <span class="font-semibold text-amber-300">2 active</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="flex min-h-screen flex-1 flex-col">
+    <header class="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm lg:px-8">
+      <div class="flex items-center gap-3 lg:hidden">
+        <button
+          type="button"
+          (click)="toggleSidebar()"
+          class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm"
+          aria-label="Toggle navigation"
+        >
+          <span class="sr-only">Toggle navigation</span>
+          <svg class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h14M3 10h14M3 14h14" />
+          </svg>
+        </button>
+        <p class="text-base font-semibold text-slate-900">LSL Operation</p>
+      </div>
+
+      <div class="hidden items-center gap-3 lg:flex">
+        <div class="space-y-1">
+          <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Next maintenance window</div>
+          <div class="text-sm font-medium text-slate-900">Friday 22:00 GST · 5 hours</div>
+        </div>
+        <div class="h-10 w-px bg-slate-200"></div>
+        <div class="space-y-1">
+          <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Live uptime</div>
+          <div class="text-sm font-medium text-emerald-600">99.982%</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        @if (user()) {
+          <div class="hidden flex-col text-right text-sm lg:flex">
+            <span class="font-semibold text-slate-900">{{ user()?.name }}</span>
+            <span class="text-xs text-slate-500">{{ user()?.role }}</span>
+          </div>
+        }
+        <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-100 text-sm font-semibold text-indigo-600">
+          {{ user()?.name?.charAt(0) || 'U' }}
+        </div>
+        <button
+          type="button"
+          (click)="onLogout()"
+          [disabled]="isSigningOut()"
+          class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <span>Sign out</span>
+          @if (isSigningOut()) {
+            <span class="ml-2 h-3 w-3 animate-spin rounded-full border border-slate-400 border-t-transparent"></span>
+          }
+        </button>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto px-4 py-8 lg:px-10">
+      <router-outlet />
+    </main>
+  </div>
+</div>
+
+@if (mobileSidebarOpen()) {
+  <div class="fixed inset-0 z-40 lg:hidden">
+    <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" (click)="closeSidebar()"></div>
+    <div class="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-slate-800 bg-slate-950 px-6 py-8 text-white shadow-2xl">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="flex h-9 w-9 items-center justify-center rounded-2xl bg-indigo-500 text-sm font-semibold text-white">
+            L
+          </div>
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-white/60">LSL Operation</p>
+            <p class="text-lg font-bold">Control Center</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          (click)="closeSidebar()"
+          class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white"
+          aria-label="Close navigation"
+        >
+          <span class="sr-only">Close navigation</span>
+          <svg class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l8 8M6 14L14 6" />
+          </svg>
+        </button>
+      </div>
+
+      <nav class="mt-10 space-y-2">
+        @for (item of navItems; track item.path) {
+          <a
+            [routerLink]="item.path"
+            (click)="closeSidebar()"
+            routerLinkActive="bg-white/10"
+            #rlaMobile="routerLinkActive"
+            class="flex flex-col gap-1 rounded-2xl px-5 py-3 text-sm transition hover:bg-white/5"
+          >
+            <span class="font-semibold tracking-wide">{{ item.label }}</span>
+            <span class="text-xs text-white/60">{{ item.description }}</span>
+          </a>
+        }
+      </nav>
+
+      <div class="mt-auto rounded-2xl border border-white/10 bg-white/5 px-5 py-6 text-sm">
+        <p class="font-semibold uppercase tracking-wide text-white/60">Signed in as</p>
+        <p class="mt-2 text-base font-semibold">{{ user()?.name ?? 'Unknown User' }}</p>
+        <p class="text-xs text-white/50">{{ user()?.email }}</p>
+        <button
+          type="button"
+          (click)="onLogout()"
+          [disabled]="isSigningOut()"
+          class="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-white/20 disabled:opacity-60"
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  </div>
+}

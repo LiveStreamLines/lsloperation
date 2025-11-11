@@ -1,0 +1,101 @@
+<section class="space-y-10">
+  <header class="rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 p-10 text-white shadow-2xl shadow-slate-900/40">
+    <div class="flex flex-wrap items-start justify-between gap-6">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-[0.4em] text-white/60">LSL operation</p>
+        <h1 class="mt-4 text-4xl font-bold tracking-tight lg:text-5xl">
+          Mission control for developers, cameras, and field teams.
+        </h1>
+        <p class="mt-4 max-w-2xl text-sm text-white/70">
+          Consolidated visibility over network-wide performance, project delivery, maintenance SLAs,
+          and content production. Every feature is designed to extend the workflows you built previously—
+          now reimagined with Tailwind-first UI and standalone Angular architecture.
+        </p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-white/10 px-6 py-5 text-sm text-white/80 shadow-lg shadow-black/20">
+        <p class="text-xs uppercase tracking-wide text-white/60">Today’s snapshot (GST)</p>
+        <ul class="mt-3 space-y-2 text-sm">
+          <li class="flex items-center justify-between">
+            <span>Live streams</span>
+            <span class="font-semibold text-white">1,247</span>
+          </li>
+          <li class="flex items-center justify-between">
+            <span>Developers online</span>
+            <span class="font-semibold text-white">18</span>
+          </li>
+          <li class="flex items-center justify-between">
+            <span>Active tasks</span>
+            <span class="font-semibold text-amber-200">24</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </header>
+
+  <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+    @for (metric of metrics; track metric.label) {
+      <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ metric.label }}</p>
+        <p class="mt-2 text-4xl font-bold text-slate-900">{{ metric.value }}</p>
+        <p class="mt-1 text-xs font-medium" [class]="metricToneClass(metric.tone)">{{ metric.delta }}</p>
+      </article>
+    }
+  </section>
+
+  <section class="grid gap-6 xl:grid-cols-3">
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 xl:col-span-2">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-semibold text-slate-900">Real-time activity</h2>
+          <p class="text-sm text-slate-500">Live feed of camera alerts, maintenance updates, and project milestones.</p>
+        </div>
+        <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          View all
+        </button>
+      </div>
+
+      <ol class="mt-6 space-y-4">
+        @for (item of timeline; track item.title) {
+          <li class="relative flex gap-4 rounded-2xl border border-slate-100 bg-slate-50/60 px-5 py-4 transition hover:border-indigo-200 hover:bg-white">
+            <span class="mt-1 inline-flex h-2.5 w-2.5 flex-shrink-0 rounded-full" [class]="timelineAccent(item.type)"></span>
+            <div class="flex-1">
+              <div class="flex items-center justify-between gap-4">
+                <h3 class="text-sm font-semibold text-slate-900">{{ item.title }}</h3>
+                <span class="text-xs font-medium text-slate-500">{{ item.time }}</span>
+              </div>
+              <p class="mt-2 text-sm text-slate-600">{{ item.description }}</p>
+            </div>
+          </li>
+        }
+      </ol>
+    </article>
+
+    <article class="space-y-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900">Focus areas</h2>
+        <p class="text-sm text-slate-500">Key workflows to revisit today.</p>
+      </div>
+
+      <div class="space-y-4 text-sm text-slate-600">
+        <div class="rounded-2xl border border-emerald-200/70 bg-emerald-50 p-4">
+          <p class="font-semibold text-emerald-700">Stabilise Logistics Gate camera</p>
+          <p class="mt-2 text-sm text-emerald-700/80">
+            Maintenance ticket MT-4816 is scheduled for this afternoon. Confirm parts availability and notify developer.
+          </p>
+        </div>
+        <div class="rounded-2xl border border-indigo-200/70 bg-indigo-50 p-4">
+          <p class="font-semibold text-indigo-700">Publish Harbour Heights story</p>
+          <p class="mt-2 text-sm text-indigo-700/80">
+            Marketing assets captured in memories module. Coordinate with developer for release approval.
+          </p>
+        </div>
+        <div class="rounded-2xl border border-amber-200/70 bg-amber-50 p-4">
+          <p class="font-semibold text-amber-700">Reconcile inventory transfers</p>
+          <p class="mt-2 text-sm text-amber-700/80">
+            14 outstanding shipments awaiting arrival confirmation. Prioritise Dubai Logistics Hub.
+          </p>
+        </div>
+      </div>
+    </article>
+  </section>
+</section>

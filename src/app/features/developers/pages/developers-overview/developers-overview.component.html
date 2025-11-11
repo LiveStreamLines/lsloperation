@@ -1,0 +1,91 @@
+<section class="space-y-10">
+  <header class="flex flex-col gap-3 rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">Developer success</p>
+        <h1 class="mt-1 text-3xl font-bold text-slate-900">Regional developer network</h1>
+      </div>
+      <button
+        type="button"
+        class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+      >
+        Configure access
+      </button>
+    </div>
+    <p class="text-sm text-slate-500">
+      Track developer performance, SLA compliance, and cross-project dependencies. Surface risks before they impact
+      site visibility.
+    </p>
+  </header>
+
+  <section class="grid gap-6 lg:grid-cols-3">
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Active developers</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">42</p>
+      <p class="mt-1 text-xs text-emerald-600">+3 onboarded this month</p>
+    </article>
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">SLA attainment</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">96%</p>
+      <p class="mt-1 text-xs text-slate-500">Across resolution and uptime targets</p>
+    </article>
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Cameras per project</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">13.5</p>
+      <p class="mt-1 text-xs text-slate-500">Average live streams per development</p>
+    </article>
+  </section>
+
+  <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900">Performance overview</h2>
+        <p class="text-sm text-slate-500">
+          Identify where escalation support or media services are required.
+        </p>
+      </div>
+      <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+        Export as report
+      </button>
+    </div>
+
+    <div class="mt-6 grid gap-4 md:grid-cols-2">
+      @for (developer of developers; track developer.tag) {
+        <article class="rounded-3xl border border-slate-100 bg-slate-50/50 p-5 transition hover:border-indigo-200 hover:bg-white">
+          <div class="flex items-start justify-between">
+            <div>
+              <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ developer.tag }}</p>
+              <h3 class="mt-1 text-lg font-semibold text-slate-900">{{ developer.name }}</h3>
+            </div>
+            <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold" [class]="badge(developer.status)">
+              {{ developer.status }}
+            </span>
+          </div>
+
+          <dl class="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-slate-500">Projects</dt>
+              <dd class="mt-1 text-base font-semibold text-slate-900">{{ developer.activeProjects }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-slate-500">Cameras online</dt>
+              <dd class="mt-1 text-base font-semibold text-slate-900">{{ developer.camerasOnline }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-slate-500">Last sync</dt>
+              <dd class="mt-1 text-sm text-slate-600">{{ developer.lastSync }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-slate-500">Escalations</dt>
+              @if (developer.status === 'Blocked') {
+                <dd class="mt-1 text-sm text-rose-500">Immediate support required</dd>
+              } @else {
+                <dd class="mt-1 text-sm text-slate-500">None</dd>
+              }
+            </div>
+          </dl>
+        </article>
+      }
+    </div>
+  </section>
+</section>

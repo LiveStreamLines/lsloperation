@@ -1,0 +1,100 @@
+<section class="space-y-10">
+  <header class="flex flex-col gap-3 rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">Project lifecycle</p>
+        <h1 class="mt-1 text-3xl font-bold text-slate-900">Program-wide visibility</h1>
+      </div>
+      <button
+        type="button"
+        class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/30 transition hover:bg-slate-800"
+      >
+        New project
+      </button>
+    </div>
+    <p class="text-sm text-slate-500">
+      Monitor progress, mobilisation, and handover readiness across developments. Consolidate budgets, cameras,
+      and documentation without leaving the dashboard.
+    </p>
+  </header>
+
+  <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Projects in flight</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">72</p>
+      <p class="mt-1 text-xs text-slate-500">Split across 12 developers</p>
+    </article>
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">On-schedule rate</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">89%</p>
+      <p class="mt-1 text-xs text-emerald-600">3 ahead of timeline this week</p>
+    </article>
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Pending approvals</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">6</p>
+      <p class="mt-1 text-xs text-amber-600">Contracts & finance checkpoints</p>
+    </article>
+  </section>
+
+  <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900">Delivery radar</h2>
+        <p class="text-sm text-slate-500">
+          Prioritised view of construction milestones and camera deployments.
+        </p>
+      </div>
+      <div class="flex gap-2">
+        <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          Timeline view
+        </button>
+        <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          Kanban
+        </button>
+      </div>
+    </div>
+
+    <div class="mt-6 grid gap-5 lg:grid-cols-3">
+      @for (project of projects; track project.name) {
+        <article class="rounded-3xl border border-slate-100 bg-slate-50/70 p-5 transition hover:border-indigo-200 hover:bg-white">
+          <div class="flex items-start justify-between">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ project.developer }}</p>
+              <h3 class="mt-2 text-lg font-semibold text-slate-900">{{ project.name }}</h3>
+            </div>
+            <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold" [class]="stageBadge(project.stage)">
+              {{ project.stage }}
+            </span>
+          </div>
+
+          <dl class="mt-4 space-y-3 text-sm">
+            <div class="flex items-center justify-between">
+              <dt class="text-slate-500">Start date</dt>
+              <dd class="font-medium text-slate-900">{{ project.startDate }}</dd>
+            </div>
+            <div class="flex items-center justify-between">
+              <dt class="text-slate-500">Target go-live</dt>
+              <dd class="font-medium text-slate-900">{{ project.goLive }}</dd>
+            </div>
+            <div>
+              <dt class="mb-1 text-slate-500">Completion</dt>
+              <div class="flex items-center gap-2">
+                <div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    class="h-full rounded-full bg-indigo-500 transition-all"
+                    [style.width.%]="project.completion"
+                  ></div>
+                </div>
+                <dd class="text-sm font-semibold text-slate-900">{{ project.completion }}%</dd>
+              </div>
+            </div>
+            <div class="flex items-center justify-between">
+              <dt class="text-slate-500">Cameras online</dt>
+              <dd class="text-sm font-semibold text-slate-900">{{ project.camerasOnline }}</dd>
+            </div>
+          </dl>
+        </article>
+      }
+    </div>
+  </section>
+</section>

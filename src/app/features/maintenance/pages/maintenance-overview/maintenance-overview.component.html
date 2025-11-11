@@ -1,0 +1,97 @@
+<section class="space-y-10">
+  <header class="flex flex-col gap-3 rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">Operations</p>
+        <h1 class="mt-1 text-3xl font-bold text-slate-900">Maintenance command center</h1>
+      </div>
+      <button
+        type="button"
+        class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+      >
+        Create work order
+      </button>
+    </div>
+    <p class="text-sm text-slate-500">
+      Schedule preventive routines, monitor SLAs, and track escalations across the camera fleet. Tie every action to
+      photographic evidence and inventory usage.
+    </p>
+  </header>
+
+  <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Open tasks</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">24</p>
+      <p class="mt-1 text-xs text-emerald-600">72% preventive vs. reactive</p>
+    </article>
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Average resolution</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">3h 18m</p>
+      <p class="mt-1 text-xs text-slate-500">Trailing 14 days</p>
+    </article>
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Compliance</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">98%</p>
+      <p class="mt-1 text-xs text-emerald-600">Checklist coverage by project</p>
+    </article>
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Escalations</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">2</p>
+      <p class="mt-1 text-xs text-amber-600">Both in Dubai Logistics Hub</p>
+    </article>
+  </section>
+
+  <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900">Active maintenance queue</h2>
+        <p class="text-sm text-slate-500">Prioritised by SLA commitments and site criticality.</p>
+      </div>
+      <div class="flex gap-2">
+        <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          Export schedule
+        </button>
+        <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          View calendar
+        </button>
+      </div>
+    </div>
+
+    <div class="mt-6 grid gap-4">
+      @for (task of tasks; track task.id) {
+        <article class="rounded-3xl border border-slate-100 bg-slate-50/70 p-5 transition hover:border-indigo-200 hover:bg-white">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ task.id }}</p>
+              <h3 class="mt-1 text-lg font-semibold text-slate-900">{{ task.title }}</h3>
+              <p class="mt-2 text-sm text-slate-500">{{ task.site }}</p>
+            </div>
+            <div class="flex flex-col items-end gap-2 text-sm">
+              <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold" [class]="priorityColor(task.priority)">
+                {{ task.priority }}
+              </span>
+              <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold" [class]="statusColor(task.status)">
+                {{ task.status }}
+              </span>
+            </div>
+          </div>
+
+          <div class="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-600">
+            <span class="inline-flex items-center gap-2">
+              <svg class="h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zm0 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" clip-rule="evenodd" />
+              </svg>
+              {{ task.due }}
+            </span>
+            <span class="inline-flex items-center gap-2">
+              <svg class="h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h12a2 2 0 012 2v1H2V6zm0 3h16l-.789 7.104A2 2 0 0115.22 18H4.78a2 2 0 01-1.99-1.896L2 9zm7 2v4h2v-4H9z" clip-rule="evenodd" />
+              </svg>
+              {{ task.assignee }}
+            </span>
+          </div>
+        </article>
+      }
+    </div>
+  </section>
+</section>

@@ -1,0 +1,77 @@
+import { Routes } from '@angular/router';
+import { authGuard } from '@core/auth/auth.guard';
+import { ShellComponent } from '@features/shell/layouts/shell/shell.component';
+
+const routes: Routes = [
+  {
+    path: '',
+    component: ShellComponent,
+    canActivate: [authGuard],
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        redirectTo: 'dashboard',
+      },
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('@features/shell/pages/dashboard/dashboard.component').then(
+            (m) => m.DashboardComponent,
+          ),
+      },
+      {
+        path: 'users',
+        loadComponent: () =>
+          import('@features/users/pages/users-overview/users-overview.component').then(
+            (m) => m.UsersOverviewComponent,
+          ),
+      },
+      {
+        path: 'developers',
+        loadComponent: () =>
+          import('@features/developers/pages/developers-overview/developers-overview.component').then(
+            (m) => m.DevelopersOverviewComponent,
+          ),
+      },
+      {
+        path: 'projects',
+        loadComponent: () =>
+          import('@features/projects/pages/projects-overview/projects-overview.component').then(
+            (m) => m.ProjectsOverviewComponent,
+          ),
+      },
+      {
+        path: 'cameras',
+        loadComponent: () =>
+          import('@features/cameras/pages/cameras-overview/cameras-overview.component').then(
+            (m) => m.CamerasOverviewComponent,
+          ),
+      },
+      {
+        path: 'inventory',
+        loadComponent: () =>
+          import('@features/inventory/pages/inventory-overview/inventory-overview.component').then(
+            (m) => m.InventoryOverviewComponent,
+          ),
+      },
+      {
+        path: 'maintenance',
+        loadComponent: () =>
+          import('@features/maintenance/pages/maintenance-overview/maintenance-overview.component').then(
+            (m) => m.MaintenanceOverviewComponent,
+          ),
+      },
+      {
+        path: 'memories',
+        loadComponent: () =>
+          import('@features/memories/pages/memories-overview/memories-overview.component').then(
+            (m) => m.MemoriesOverviewComponent,
+          ),
+      },
+    ],
+  },
+];
+
+export default routes;
+

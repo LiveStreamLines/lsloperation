@@ -1,0 +1,95 @@
+<section class="space-y-10">
+  <header class="flex flex-col gap-3 rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">Supply chain</p>
+        <h1 class="mt-1 text-3xl font-bold text-slate-900">Inventory orchestration</h1>
+      </div>
+      <button
+        type="button"
+        class="inline-flex items-center rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-300 transition hover:bg-indigo-500"
+      >
+        Create transfer
+      </button>
+    </div>
+    <p class="text-sm text-slate-500">
+      Manage inventory from central warehouse to installation site. Coordinate allocation rules, RMA cycles, and
+      warranty coverage without spreadsheets.
+    </p>
+  </header>
+
+  <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Assets deployed</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">3,482</p>
+      <p class="mt-1 text-xs text-emerald-600">+112 in the last 7 days</p>
+    </article>
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Transit shipments</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">18</p>
+      <p class="mt-1 text-xs text-slate-500">Across 6 regions</p>
+    </article>
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Warehouse stock</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">742</p>
+      <p class="mt-1 text-xs text-amber-600">Reorder threshold in 3 weeks</p>
+    </article>
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">RMA queue</p>
+      <p class="mt-2 text-4xl font-bold text-slate-900">5</p>
+      <p class="mt-1 text-xs text-slate-500">Awaiting vendor confirmation</p>
+    </article>
+  </section>
+
+  <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900">Recent movements</h2>
+        <p class="text-sm text-slate-500">
+          Track shipment progress, installation completions, and warehouse transfers.
+        </p>
+      </div>
+      <div class="flex gap-2">
+        <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          Export manifest
+        </button>
+        <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          Configure rules
+        </button>
+      </div>
+    </div>
+
+    <div class="mt-6 overflow-hidden rounded-2xl border border-slate-100">
+      <table class="min-w-full divide-y divide-slate-100 text-left text-sm">
+        <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <tr>
+            <th class="px-5 py-3">Asset</th>
+            <th class="px-5 py-3">Type</th>
+            <th class="px-5 py-3">Location</th>
+            <th class="px-5 py-3">Project</th>
+            <th class="px-5 py-3">Last movement</th>
+            <th class="px-5 py-3">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 bg-white">
+          @for (item of items; track item.assetId) {
+            <tr class="transition hover:bg-slate-50/70">
+              <td class="px-5 py-4 font-semibold text-slate-900">{{ item.assetId }}</td>
+              <td class="px-5 py-4 text-sm text-slate-600">{{ item.type }}</td>
+              <td class="px-5 py-4 text-sm text-slate-500">{{ item.location }}</td>
+              <td class="px-5 py-4 text-sm text-slate-600">
+                {{ item.assignedProject ?? 'Unassigned' }}
+              </td>
+              <td class="px-5 py-4 text-sm text-slate-500">{{ item.lastMovement }}</td>
+              <td class="px-5 py-4">
+                <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold" [class]="statusColor(item.status)">
+                  {{ item.status }}
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>

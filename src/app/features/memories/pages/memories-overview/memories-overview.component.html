@@ -1,0 +1,67 @@
+<section class="space-y-10">
+  <header class="flex flex-col gap-3 rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">Media studio</p>
+        <h1 class="mt-1 text-3xl font-bold text-slate-900">Memories & storytelling</h1>
+      </div>
+      <button
+        type="button"
+        class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/30 transition hover:bg-slate-800"
+      >
+        Upload media
+      </button>
+    </div>
+    <p class="text-sm text-slate-500">
+      Curate cinematic assets from live camera feeds, drone captures, and field uploads. Share progress narratives
+      with developers and marketing teams instantly.
+    </p>
+  </header>
+
+  <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+    @for (memory of memories; track memory.title) {
+      <article class="group relative overflow-hidden rounded-3xl border border-slate-100 bg-slate-950 text-white shadow-lg shadow-slate-950/40">
+        <div class="absolute inset-0 bg-gradient-to-br from-indigo-500/40 via-slate-950/70 to-slate-950"></div>
+        <div class="relative flex min-h-[240px] flex-col justify-between p-6">
+          <div>
+            <span class="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white/70">
+              {{ memory.project }}
+            </span>
+            <h3 class="mt-4 text-xl font-semibold tracking-tight text-white">{{ memory.title }}</h3>
+          </div>
+          <div class="space-y-3 text-sm text-white/70">
+            <div class="flex items-center gap-2">
+              <svg class="h-4 w-4 text-white/50" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v2H3a1 1 0 100 2h1v2H3a1 1 0 000 2h1v2H3a1 1 0 000 2h1v2a2 2 0 002 2h8a2 2 0 002-2v-2h1a1 1 0 000-2h-1v-2h1a1 1 0 000-2h-1V8h1a1 1 0 100-2h-1V4a2 2 0 00-2-2H6zm8 4H6V4h8v2zm0 2H6v2h8V8zm0 4H6v2h8v-2z" clip-rule="evenodd" />
+              </svg>
+              {{ memory.capturedAt }}
+            </div>
+            <div class="flex items-center gap-2">
+              <svg class="h-4 w-4 text-white/50" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M13 7H7v6h6V7z" />
+                <path fill-rule="evenodd" d="M5 5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2H5zm10 2H5v6h10V7z" clip-rule="evenodd" />
+              </svg>
+              {{ memory.contributor }}
+            </div>
+            <div class="flex flex-wrap gap-2">
+              @for (tag of memory.tags; track tag) {
+                <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">{{ tag }}</span>
+              }
+            </div>
+          </div>
+        </div>
+        <div class="absolute inset-x-0 bottom-0">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between bg-white/10 px-6 py-4 text-sm font-semibold uppercase tracking-wide text-white backdrop-blur transition group-hover:bg-white/20"
+          >
+            View asset
+            <svg class="h-4 w-4 transition group-hover:translate-x-1" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h10.586l-3.293-3.293a1 1 0 111.414-1.414l5 5a.997.997 0 01.083.094.99.99 0 01.196.574v.058a.997.997 0 01-.279.676l-5 5a1 1 0 11-1.414-1.414L14.586 11H4a1 1 0 01-1-1z" clip-rule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      </article>
+    }
+  </section>
+</section>
