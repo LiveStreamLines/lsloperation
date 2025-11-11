@@ -5,12 +5,22 @@
         <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">Supply chain</p>
         <h1 class="mt-1 text-3xl font-bold text-slate-900">Inventory orchestration</h1>
       </div>
-      <button
-        type="button"
-        class="inline-flex items-center rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-300 transition hover:bg-indigo-500"
-      >
-        Create transfer
-      </button>
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="inline-flex items-center rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-300 transition hover:bg-indigo-500"
+          (click)="openCreateDeviceModal()"
+        >
+          Add stock
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+          (click)="openDeviceTypeModal()"
+        >
+          Add device type
+        </button>
+      </div>
     </div>
     <p class="text-sm text-slate-500">
       Manage inventory from central warehouse to installation site. Coordinate allocation rules, RMA cycles, and
@@ -18,27 +28,212 @@
     </p>
   </header>
 
+  <section class="space-y-6">
+    <div class="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition"
+        [ngClass]="selectedDeviceType() ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50' : 'border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-300'"
+        (click)="onDeviceTypeChange('')"
+      >
+        All types
+      </button>
+      @for (type of deviceTypes(); track type._id) {
+        <button
+          type="button"
+          class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition"
+          [ngClass]="selectedDeviceType() === type.name ? 'border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-300' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'"
+          (click)="onDeviceTypeChange(selectedDeviceType() === type.name ? '' : (type.name || ''))"
+        >
+          {{ type.name }}
+        </button>
+      }
+    </div>
+
+    @if (deviceModelOptions().length > 0) {
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition"
+          [ngClass]="
+            !selectedDeviceModel()
+              ? 'border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-300'
+              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+          "
+          (click)="selectedDeviceModel.set(null)"
+        >
+          All models
+        </button>
+        @for (model of deviceModelOptions(); track model) {
+          <button
+            type="button"
+            class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition"
+            [ngClass]="
+              selectedDeviceModel() === model
+                ? 'border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-300'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            "
+            (click)="onDeviceModelSelect(model)"
+          >
+            {{ model }}
+          </button>
+        }
+      </div>
+    }
+
+    <div class="flex flex-wrap gap-2">
+      @for (status of statusOptions; track status.label) {
+        <button
+          type="button"
+          class="inline-flex items-center rounded-full border px-4 py-1 text-xs font-semibold uppercase tracking-wide transition"
+          [ngClass]="selectedStatus() === status.value ? 'border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-300' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'"
+          (click)="onStatusChange(status.value || '')"
+        >
+          {{ status.label }}
+        </button>
+      }
+      <button
+        type="button"
+        class="ml-auto inline-flex items-center rounded-full border px-4 py-1 text-xs font-semibold uppercase tracking-wide transition"
+        [ngClass]="
+          showAlarmedOnly()
+            ? 'border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-300'
+            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+        "
+        (click)="toggleAlarmedOnly()"
+      >
+        <span class="mr-2">Alarmed</span>
+        <span
+          class="relative inline-flex h-5 w-10 items-center rounded-full"
+          [ngClass]="showAlarmedOnly() ? 'bg-indigo-500' : 'bg-slate-200'"
+        >
+          <span
+            class="inline-block h-4 w-4 transform rounded-full bg-white transition"
+            [ngStyle]="showAlarmedOnly() ? { transform: 'translateX(20px)' } : { transform: 'translateX(2px)' }"
+          ></span>
+        </span>
+      </button>
+    </div>
+
+    @if (selectedStatus() === 'user_assigned' && assignedUserOptions().length > 0) {
+      <div class="flex flex-wrap gap-2">
+        @for (option of assignedUserOptions(); track option.id) {
+          <button
+            type="button"
+            class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition"
+            [ngClass]="
+              selectedAdminId() === option.id
+                ? 'border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-300'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            "
+            (click)="onAssignedUserFilterSelect(option.id)"
+          >
+            <span>{{ option.name }}</span>
+            <span
+              class="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+              [ngClass]="selectedAdminId() === option.id ? 'text-indigo-100' : 'text-slate-400'"
+            >
+              {{ option.count }}
+            </span>
+          </button>
+        }
+      </div>
+    }
+
+    <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-wrap items-end gap-4">
+        @if (selectedStatus() === 'assigned') {
+          <div class="flex flex-col gap-2">
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Developer</label>
+            <select
+              class="min-w-[12rem] rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [value]="selectedDeveloperId() ?? ''"
+              (change)="onDeveloperChange($any($event.target).value)"
+            >
+              <option value="">All developers</option>
+              @for (developer of developers(); track developer._id) {
+                <option [value]="developer._id">{{ developer.developerName }}</option>
+              }
+            </select>
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Project</label>
+            <select
+              class="min-w-[12rem] rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+              [disabled]="!selectedDeveloperId()"
+              [value]="selectedProjectId() ?? ''"
+              (change)="onProjectChange($any($event.target).value)"
+            >
+              <option value="">All projects</option>
+              @for (project of projects(); track project._id) {
+                <option [value]="project._id">{{ project.projectName }}</option>
+              }
+            </select>
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Camera</label>
+            <select
+              class="min-w-[12rem] rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+              [disabled]="!selectedProjectId()"
+              [value]="selectedCameraId() ?? ''"
+              (change)="onCameraChange($any($event.target).value)"
+            >
+              <option value="">All cameras</option>
+              @for (camera of cameras(); track camera._id) {
+                <option [value]="camera._id">{{ camera.cameraDescription ?? camera.camera }}</option>
+              }
+            </select>
+          </div>
+        }
+
+        <div class="flex flex-1 flex-col gap-2 min-w-[12rem]">
+          <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Serial number</label>
+          <div class="relative">
+            <input
+              type="search"
+              class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Search serial number..."
+              [value]="serialQuery()"
+              (input)="onSerialQueryChange($any($event.target).value)"
+            />
+            <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-400">
+              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M12.9 14.32a7 7 0 111.414-1.414l4.387 4.387a1 1 0 01-1.414 1.414l-4.387-4.387zM8 13a5 5 0 100-10 5 5 0 000 10z" clip-rule="evenodd" />
+              </svg>
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+            (click)="clearFilters()"
+          >
+            Clear filters
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Assets deployed</p>
-      <p class="mt-2 text-4xl font-bold text-slate-900">3,482</p>
-      <p class="mt-1 text-xs text-emerald-600">+112 in the last 7 days</p>
-    </article>
-    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Transit shipments</p>
-      <p class="mt-2 text-4xl font-bold text-slate-900">18</p>
-      <p class="mt-1 text-xs text-slate-500">Across 6 regions</p>
-    </article>
-    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Warehouse stock</p>
-      <p class="mt-2 text-4xl font-bold text-slate-900">742</p>
-      <p class="mt-1 text-xs text-amber-600">Reorder threshold in 3 weeks</p>
-    </article>
-    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">RMA queue</p>
-      <p class="mt-2 text-4xl font-bold text-slate-900">5</p>
-      <p class="mt-1 text-xs text-slate-500">Awaiting vendor confirmation</p>
-    </article>
+    @for (card of metricCards(); track card.title) {
+      <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ card.title }}</p>
+        <p class="mt-2 text-4xl font-bold text-slate-900">{{ card.value }}</p>
+        <p
+          class="mt-1 text-xs"
+          [ngClass]="{
+            'text-emerald-600': card.tone === 'positive',
+            'text-amber-600': card.tone === 'warning',
+            'text-slate-500': card.tone === 'default'
+          }"
+        >
+          {{ card.helper }}
+        </p>
+      </article>
+    }
   </section>
 
   <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
@@ -49,47 +244,927 @@
           Track shipment progress, installation completions, and warehouse transfers.
         </p>
       </div>
-      <div class="flex gap-2">
-        <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-          Export manifest
-        </button>
-        <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-          Configure rules
-        </button>
+      <div class="flex items-center gap-3 text-xs text-slate-500">
+        <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
+          Total <span class="font-bold text-slate-900">{{ filteredItems().length }}</span>
+        </span>
+        <span *ngIf="isLoading()" class="text-indigo-600">Loading…</span>
       </div>
     </div>
 
-    <div class="mt-6 overflow-hidden rounded-2xl border border-slate-100">
-      <table class="min-w-full divide-y divide-slate-100 text-left text-sm">
-        <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          <tr>
-            <th class="px-5 py-3">Asset</th>
-            <th class="px-5 py-3">Type</th>
-            <th class="px-5 py-3">Location</th>
-            <th class="px-5 py-3">Project</th>
-            <th class="px-5 py-3">Last movement</th>
-            <th class="px-5 py-3">Status</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100 bg-white">
-          @for (item of items; track item.assetId) {
-            <tr class="transition hover:bg-slate-50/70">
-              <td class="px-5 py-4 font-semibold text-slate-900">{{ item.assetId }}</td>
-              <td class="px-5 py-4 text-sm text-slate-600">{{ item.type }}</td>
-              <td class="px-5 py-4 text-sm text-slate-500">{{ item.location }}</td>
-              <td class="px-5 py-4 text-sm text-slate-600">
-                {{ item.assignedProject ?? 'Unassigned' }}
-              </td>
-              <td class="px-5 py-4 text-sm text-slate-500">{{ item.lastMovement }}</td>
-              <td class="px-5 py-4">
-                <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold" [class]="statusColor(item.status)">
-                  {{ item.status }}
-                </span>
-              </td>
+    @if (errorMessage()) {
+      <div class="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+        {{ errorMessage() }}
+      </div>
+    } @else if (!isLoading() && items().length === 0) {
+      <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-500">
+        No inventory records found. Newly added devices will appear here.
+      </div>
+    } @else {
+      <div class="mt-6 overflow-hidden rounded-2xl border border-slate-100">
+        <table class="min-w-full divide-y divide-slate-100 text-left text-sm">
+          <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <tr>
+              <th class="px-5 py-3">Device</th>
+              <th class="px-5 py-3">Serial</th>
+              <th class="px-5 py-3">Assignment</th>
+              <th class="px-5 py-3">Last movement</th>
+              <th class="px-5 py-3">Age</th>
+              <th class="px-5 py-3">Validity left</th>
+              <th class="px-5 py-3">Status</th>
+              <th class="px-5 py-3 text-right">Actions</th>
             </tr>
-          }
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody class="divide-y divide-slate-100 bg-white">
+            @for (item of filteredItems(); track item._id) {
+              <tr class="transition hover:bg-slate-50/70">
+                <td class="px-5 py-4">
+                  <div class="flex flex-col gap-1">
+                    <span class="text-sm font-semibold text-slate-900">
+                      {{ item.device?.type || '—' }}
+                    </span>
+                    <span class="text-xs text-slate-500">{{ item.device?.model || 'Model pending' }}</span>
+                  </div>
+                </td>
+                <td class="px-5 py-4">
+                  <div class="flex items-center gap-2 text-sm text-slate-700">
+                    <span class="font-mono text-slate-900">{{ item.device?.serialNumber || '—' }}</span>
+                  </div>
+                </td>
+                <td class="px-5 py-4">
+                  <div class="flex flex-col gap-1 text-xs text-slate-600">
+                    <span>{{ assignmentSummary(item) }}</span>
+                    <span *ngIf="item.currentAssignment?.assignedDate as assigned"
+                      >Since {{ assigned | date: 'mediumDate' }}</span
+                    >
+                    <span *ngIf="item.currentUserAssignment?.assignedDate as assigned"
+                      >Since {{ assigned | date: 'mediumDate' }}</span
+                    >
+                  </div>
+                </td>
+                <td class="px-5 py-4">
+                  <span class="text-sm text-slate-600">{{ lastMovement(item) }}</span>
+                </td>
+                <td class="px-5 py-4">
+                  @let age = getItemAgeInDays(item);
+                  @if (age === null) {
+                    <span class="text-sm text-slate-400">—</span>
+                  } @else {
+                    <div class="flex items-baseline gap-1">
+                      <span class="text-sm font-semibold text-slate-900">{{ age }}</span>
+                      <span class="text-xs uppercase tracking-wide text-slate-400">days</span>
+                    </div>
+                  }
+                </td>
+                <td class="px-5 py-4">
+                  @let remaining = getRemainingValidityDays(item);
+                  @if (remaining === null) {
+                    <span class="text-sm text-slate-400">—</span>
+                  } @else {
+                    <div class="flex flex-col gap-1">
+                      <div class="flex items-baseline gap-1">
+                        <span
+                          class="text-sm font-semibold"
+                          [ngClass]="
+                            remaining <= 0
+                              ? 'text-rose-600'
+                              : remaining <= 30
+                              ? 'text-amber-600'
+                              : 'text-slate-900'
+                          "
+                        >
+                          {{ remaining > 0 ? remaining : 0 }}
+                        </span>
+                        <span class="text-xs uppercase tracking-wide text-slate-400">days</span>
+                      </div>
+                      @if (remaining <= 0) {
+                        <span class="text-xs font-semibold uppercase tracking-wide text-rose-600">Expired</span>
+                      } @else if (remaining <= 30) {
+                        <span class="text-xs font-semibold uppercase tracking-wide text-amber-600">Expiring soon</span>
+                      }
+                    </div>
+                  }
+                </td>
+                <td class="px-5 py-4">
+                  <span
+                    class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+                    [ngClass]="statusColor(item.status)"
+                  >
+                    {{ statusLabel(item.status) }}
+                  </span>
+                </td>
+                <td class="px-5 py-4">
+                  <div class="flex flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      class="rounded-2xl border border-indigo-200 px-3 py-1 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-60"
+                      (click)="openAssignProjectModal(item)"
+                      [disabled]="!canAssignToProject(item)"
+                    >
+                      Assign project
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-2xl border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+                      (click)="openUnassignProjectModal(item)"
+                      [disabled]="!canUnassignFromProject(item)"
+                    >
+                      Unassign project
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-2xl border border-sky-200 px-3 py-1 text-xs font-semibold text-sky-600 transition hover:bg-sky-50 disabled:opacity-60"
+                      (click)="openAssignUserModal(item)"
+                      [disabled]="!canAssignToUser(item)"
+                    >
+                      Assign user
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-2xl border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-600 transition hover:bg-amber-50 disabled:opacity-60"
+                      (click)="openUnassignUserModal(item)"
+                      [disabled]="!canUnassignFromUser(item)"
+                    >
+                      Unassign user
+                    </button>
+
+                    <button
+                      type="button"
+                      class="rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                      (click)="viewItemModal.set(item)"
+                    >
+                      View
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
   </section>
 </section>
+
+@if (isDeviceTypeModalOpen()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+    <div class="relative w-full max-w-xl rounded-3xl bg-white p-8 shadow-2xl">
+      <button
+        type="button"
+        class="absolute right-4 top-4 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900"
+        (click)="closeDeviceTypeModal()"
+        [disabled]="isSavingDeviceType()"
+      >
+        <span class="sr-only">Close modal</span>
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M6.28 5.22a.75.75 0 10-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
+        </svg>
+      </button>
+
+      <div class="space-y-6">
+        <header class="space-y-2">
+          <h2 class="text-xl font-semibold text-slate-900">
+            {{ editingDeviceTypeId() ? 'Edit device type' : 'Add device type' }}
+          </h2>
+          <p class="text-sm text-slate-500">
+            {{ editingDeviceTypeId() ? 'Update the selected category or adjust its validity window.' : 'Register a new inventory category with its default validity.' }}
+          </p>
+          @if (editingDeviceType()) {
+            <div class="flex items-center justify-between rounded-2xl bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+              <div>
+                <p class="font-semibold">Editing {{ editingDeviceType()?.name }}</p>
+                <p class="text-xs text-indigo-700/80">Changes will apply immediately after saving.</p>
+              </div>
+              <button
+                type="button"
+                class="rounded-full border border-indigo-200 px-3 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                (click)="cancelDeviceTypeEdit()"
+                [disabled]="isSavingDeviceType()"
+              >
+                Cancel edit
+              </button>
+            </div>
+          }
+        </header>
+
+        @if (deviceTypeError()) {
+          <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {{ deviceTypeError() }}
+          </div>
+        }
+
+        <div class="grid gap-4">
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Name</span>
+            <input
+              type="text"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="e.g. SIM Card"
+              [value]="deviceTypeForm().name"
+              (input)="onDeviceTypeNameInput($any($event.target).value)"
+            />
+          </label>
+
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Validity (days)</span>
+            <input
+              type="number"
+              min="1"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="e.g. 365"
+              [value]="deviceTypeForm().validityDays"
+              (input)="onDeviceTypeValidityInput($any($event.target).value)"
+            />
+          </label>
+
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Models</span>
+            <textarea
+              rows="3"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="e.g. Nikon D3500, Nikon D2000, Canon 1000"
+              [value]="deviceTypeForm().suggestedModels"
+              (input)="onDeviceTypeModelsInput($any($event.target).value)"
+            ></textarea>
+            <span class="text-xs text-slate-400">Separate models with commas or dashes.</span>
+          </label>
+        </div>
+
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Existing device types</p>
+          <div class="mt-3 max-h-48 space-y-2 overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            @if (deviceTypes().length === 0) {
+              <p class="text-sm text-slate-500">No device types yet.</p>
+            } @else {
+              @for (type of deviceTypes(); track type._id) {
+                <div
+                  class="flex items-center justify-between rounded-2xl px-4 py-3 shadow-sm ring-1"
+                  [ngClass]="
+                    editingDeviceTypeId() === type._id
+                      ? 'bg-indigo-50 ring-indigo-200'
+                      : 'bg-white ring-slate-100'
+                  "
+                >
+                  <div>
+                    <p class="text-sm font-semibold text-slate-900">{{ type.name }}</p>
+                    <p class="text-xs text-slate-500 flex items-center gap-2">
+                      <span>{{ type.validityDays }} days</span>
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                        [ngClass]="type.isActive === false ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'"
+                      >
+                        {{ type.isActive === false ? 'Inactive' : 'Active' }}
+                      </span>
+                    </p>
+                    @if (type.models?.length) {
+                      <div class="mt-2 flex flex-wrap gap-2">
+                        @for (model of type.models; track model) {
+                          <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            {{ model }}
+                          </span>
+                        }
+                      </div>
+                    }
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button
+                      type="button"
+                      class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      (click)="startEditDeviceType(type)"
+                      [disabled]="isSavingDeviceType() || deletingDeviceTypeId() === type._id"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      (click)="deleteDeviceType(type)"
+                      [disabled]="deletingDeviceTypeId() === type._id || isSavingDeviceType()"
+                    >
+                      <span>Delete</span>
+                      @if (deletingDeviceTypeId() === type._id) {
+                        <span class="ml-2 h-3 w-3 animate-spin rounded-full border border-rose-500 border-t-transparent"></span>
+                      }
+                    </button>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            (click)="closeDeviceTypeModal()"
+            [disabled]="isSavingDeviceType()"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-300 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+            (click)="saveDeviceType()"
+            [disabled]="isSavingDeviceType()"
+          >
+            <span>{{ editingDeviceTypeId() ? 'Update type' : 'Save type' }}</span>
+            @if (isSavingDeviceType()) {
+              <span class="ml-2 h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></span>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (assignProjectModalItem()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+    <div class="relative w-full max-w-2xl rounded-3xl bg-white p-8 shadow-2xl">
+      <button
+        type="button"
+        class="absolute right-4 top-4 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900"
+        (click)="closeAssignProjectModal()"
+        [disabled]="assignProjectState().isSaving"
+      >
+        <span class="sr-only">Close modal</span>
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M6.28 5.22a.75.75 0 10-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
+        </svg>
+      </button>
+
+      <div class="space-y-6">
+        <header>
+          <h2 class="text-xl font-semibold text-slate-900">Assign to project</h2>
+          <p class="mt-1 text-sm text-slate-500">
+            Select the deployment target for this device.
+          </p>
+        </header>
+
+        @if (assignProjectState().error) {
+          <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {{ assignProjectState().error }}
+          </div>
+        }
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Developer</span>
+            <select
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [value]="assignProjectState().developerId"
+              (change)="onAssignProjectDeveloperChange($any($event.target).value)"
+            >
+              <option value="">Select developer</option>
+              @for (developer of developers(); track developer._id) {
+                <option [value]="developer._id">{{ developer.developerName }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Project</span>
+            <select
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+              [value]="assignProjectState().projectId"
+              [disabled]="!assignProjectState().developerId"
+              (change)="onAssignProjectProjectChange($any($event.target).value)"
+            >
+              <option value="">Select project</option>
+              @for (project of assignProjectProjects(); track project._id) {
+                <option [value]="project._id">{{ project.projectName }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Camera</span>
+            <select
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+              [value]="assignProjectState().cameraId"
+              [disabled]="!assignProjectState().projectId"
+              (change)="onAssignProjectCameraChange($any($event.target).value)"
+            >
+              <option value="">Select camera</option>
+              @for (camera of assignProjectCameras(); track camera._id) {
+                <option [value]="camera._id">{{ camera.cameraDescription ?? camera.camera }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2">
+            <span class="font-semibold text-slate-800">Notes <span class="text-xs text-slate-400">(optional)</span></span>
+            <textarea
+              rows="3"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [value]="assignProjectState().notes"
+              (input)="onAssignProjectNotesChange($any($event.target).value)"
+            ></textarea>
+          </label>
+        </div>
+
+        <div class="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            (click)="closeAssignProjectModal()"
+            [disabled]="assignProjectState().isSaving"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-300 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+            (click)="saveAssignProject()"
+            [disabled]="assignProjectState().isSaving"
+          >
+            <span>Save assignment</span>
+            @if (assignProjectState().isSaving) {
+              <span class="ml-2 h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></span>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (createDeviceModalOpen()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+    <div class="relative w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl">
+      <button
+        type="button"
+        class="absolute right-4 top-4 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900"
+        (click)="closeCreateDeviceModal()"
+        [disabled]="createDeviceState().isSaving"
+      >
+        <span class="sr-only">Close modal</span>
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M6.28 5.22a.75.75 0 10-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
+        </svg>
+      </button>
+
+      <div class="space-y-6">
+        <header>
+          <h2 class="text-xl font-semibold text-slate-900">Add inventory item</h2>
+          <p class="mt-1 text-sm text-slate-500">
+            Register a new device in the stock pool.
+          </p>
+        </header>
+
+        @if (createDeviceState().error) {
+          <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {{ createDeviceState().error }}
+          </div>
+        }
+
+        <div class="grid gap-4">
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Device type</span>
+            <select
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [value]="createDeviceState().type"
+              (change)="onCreateDeviceTypeChange($any($event.target).value)"
+            >
+              <option value="">Select type</option>
+              @for (type of deviceTypes(); track type._id) {
+                <option [value]="type.name">{{ type.name }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Serial number</span>
+            <input
+              type="text"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Enter serial number"
+              [value]="createDeviceState().serialNumber"
+              (input)="onCreateDeviceSerialChange($any($event.target).value)"
+            />
+          </label>
+
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Model <span class="text-xs text-slate-400" *ngIf="typeModelOptions().length === 0">(optional)</span></span>
+            @if (typeModelOptions().length > 0) {
+              <span class="text-xs font-semibold uppercase tracking-wide text-slate-400">Suggested models</span>
+              <div class="flex flex-wrap gap-2">
+                @for (model of typeModelOptions(); track model) {
+                  <button
+                    type="button"
+                    class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition"
+                    [ngClass]="createDeviceState().model === model ? 'border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-300' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'"
+                    (click)="onCreateDeviceModelSelect(model)"
+                  >
+                    {{ model }}
+                  </button>
+                }
+                <button
+                  type="button"
+                  class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 transition hover:bg-slate-50"
+                  (click)="onCreateDeviceModelSelect('')"
+                >
+                  Custom model
+                </button>
+              </div>
+              @if (createDeviceState().model === '') {
+                <input
+                  type="text"
+                  class="mt-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Enter custom model"
+                  [value]="createDeviceState().model"
+                  (input)="onCreateDeviceModelChange($any($event.target).value)"
+                />
+              }
+            } @else {
+              <input
+                type="text"
+                class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Enter model"
+                [value]="createDeviceState().model"
+                (input)="onCreateDeviceModelChange($any($event.target).value)"
+              />
+            }
+          </label>
+        </div>
+
+        <div class="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            (click)="closeCreateDeviceModal()"
+            [disabled]="createDeviceState().isSaving"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-300 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+            (click)="saveCreateDevice()"
+            [disabled]="createDeviceState().isSaving"
+          >
+            <span>Add device</span>
+            @if (createDeviceState().isSaving) {
+              <span class="ml-2 h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></span>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (assignUserModalItem()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+    <div class="relative w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl">
+      <button
+        type="button"
+        class="absolute right-4 top-4 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900"
+        (click)="closeAssignUserModal()"
+        [disabled]="assignUserState().isSaving"
+      >
+        <span class="sr-only">Close modal</span>
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M6.28 5.22a.75.75 0 10-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
+        </svg>
+      </button>
+
+      <div class="space-y-6">
+        <header>
+          <h2 class="text-xl font-semibold text-slate-900">Assign to user</h2>
+          <p class="mt-1 text-sm text-slate-500">
+            Choose the administrator responsible for this device.
+          </p>
+        </header>
+
+        @if (assignUserState().error) {
+          <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {{ assignUserState().error }}
+          </div>
+        }
+
+        <div class="grid gap-4">
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">User</span>
+            <select
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [value]="assignUserState().adminId"
+              (change)="onAssignUserAdminChange($any($event.target).value)"
+            >
+              <option value="">Select user</option>
+              @for (admin of admins(); track admin._id) {
+                <option [value]="admin._id">{{ admin.name }} ({{ admin.role }})</option>
+              }
+            </select>
+          </label>
+
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Notes <span class="text-xs text-slate-400">(optional)</span></span>
+            <textarea
+              rows="3"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [value]="assignUserState().notes"
+              (input)="onAssignUserNotesChange($any($event.target).value)"
+            ></textarea>
+          </label>
+        </div>
+
+        <div class="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            (click)="closeAssignUserModal()"
+            [disabled]="assignUserState().isSaving"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-300 transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+            (click)="saveAssignUser()"
+            [disabled]="assignUserState().isSaving"
+          >
+            <span>Save assignment</span>
+            @if (assignUserState().isSaving) {
+              <span class="ml-2 h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></span>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (unassignProjectModalItem()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+    <div class="relative w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl">
+      <button
+        type="button"
+        class="absolute right-4 top-4 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900"
+        (click)="closeUnassignProjectModal()"
+        [disabled]="unassignProjectState().isSaving"
+      >
+        <span class="sr-only">Close modal</span>
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M6.28 5.22a.75.75 0 10-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
+        </svg>
+      </button>
+
+      <div class="space-y-6">
+        <header>
+          <h2 class="text-xl font-semibold text-slate-900">Unassign from project</h2>
+          <p class="mt-1 text-sm text-slate-500">
+            Provide a reason for removing this device from the project.
+          </p>
+        </header>
+
+        @if (unassignProjectState().error) {
+          <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {{ unassignProjectState().error }}
+          </div>
+        }
+
+        <label class="flex flex-col gap-2 text-sm text-slate-600">
+          <span class="font-semibold text-slate-800">Reason</span>
+          <textarea
+            rows="3"
+            class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            [value]="unassignProjectState().reason"
+            (input)="onUnassignProjectReasonChange($any($event.target).value)"
+          ></textarea>
+        </label>
+
+        <div class="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            (click)="closeUnassignProjectModal()"
+            [disabled]="unassignProjectState().isSaving"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded-2xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-rose-300 transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+            (click)="saveUnassignProject()"
+            [disabled]="unassignProjectState().isSaving"
+          >
+            <span>Unassign</span>
+            @if (unassignProjectState().isSaving) {
+              <span class="ml-2 h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></span>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (unassignUserModalItem()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+    <div class="relative w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl">
+      <button
+        type="button"
+        class="absolute right-4 top-4 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900"
+        (click)="closeUnassignUserModal()"
+        [disabled]="unassignUserState().isSaving"
+      >
+        <span class="sr-only">Close modal</span>
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M6.28 5.22a.75.75 0 10-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
+        </svg>
+      </button>
+
+      <div class="space-y-6">
+        <header>
+          <h2 class="text-xl font-semibold text-slate-900">Unassign from user</h2>
+          <p class="mt-1 text-sm text-slate-500">
+            Provide a reason for removing this device from the user.
+          </p>
+        </header>
+
+        @if (unassignUserState().error) {
+          <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {{ unassignUserState().error }}
+          </div>
+        }
+
+        <label class="flex flex-col gap-2 text-sm text-slate-600">
+          <span class="font-semibold text-slate-800">Reason</span>
+          <textarea
+            rows="3"
+            class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            [value]="unassignUserState().reason"
+            (input)="onUnassignUserReasonChange($any($event.target).value)"
+          ></textarea>
+        </label>
+
+        <div class="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            (click)="closeUnassignUserModal()"
+            [disabled]="unassignUserState().isSaving"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded-2xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-300 transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+            (click)="saveUnassignUser()"
+            [disabled]="unassignUserState().isSaving"
+          >
+            <span>Unassign</span>
+            @if (unassignUserState().isSaving) {
+              <span class="ml-2 h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></span>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (viewItemModal()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+    <div class="relative w-full max-w-3xl rounded-3xl bg-white p-8 shadow-2xl">
+      <button
+        type="button"
+        class="absolute right-4 top-4 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900"
+        (click)="viewItemModal.set(null)"
+      >
+        <span class="sr-only">Close modal</span>
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M6.28 5.22a.75.75 0 10-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z" />
+        </svg>
+      </button>
+
+      <div class="space-y-6">
+        <header>
+          <h2 class="text-xl font-semibold text-slate-900">Inventory details</h2>
+          <p class="mt-1 text-sm text-slate-500">
+            Historical activity for this device.
+          </p>
+        </header>
+
+        <section class="grid gap-4 rounded-3xl border border-slate-100 bg-slate-50 p-4 md:grid-cols-2">
+          <div>
+            <p class="text-xs uppercase tracking-wide text-slate-500">Device type</p>
+            <p class="text-sm font-semibold text-slate-900">{{ viewItemModal()?.device?.type ?? 'Unknown' }}</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wide text-slate-500">Serial number</p>
+            <p class="text-sm font-semibold text-slate-900">{{ viewItemModal()?.device?.serialNumber ?? '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wide text-slate-500">Model</p>
+            <p class="text-sm font-semibold text-slate-900">{{ viewItemModal()?.device?.model ?? '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wide text-slate-500">Current status</p>
+            <p class="text-sm font-semibold text-slate-900">{{ statusLabel(viewItemModal()?.status) }}</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wide text-slate-500">Created</p>
+            <p class="text-sm font-semibold text-slate-900">{{ viewItemModal()?.createdDate ? (viewItemModal()?.createdDate | date:'medium') : '—' }}</p>
+          </div>
+        </section>
+
+        <section class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-slate-900">Project assignment history</h3>
+            <span class="text-xs text-slate-500">Newest first</span>
+          </div>
+
+          <div class="max-h-60 space-y-3 overflow-y-auto rounded-2xl border border-slate-100 bg-white p-4">
+            @if ((viewItemModal()?.currentAssignment || null) === null && !(viewItemModal()?.assignmentHistory?.length)) {
+              <p class="text-sm text-slate-500">No project assignments yet.</p>
+            } @else {
+              @if (viewItemModal()?.currentAssignment) {
+                <article class="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-4">
+                  <header class="flex items-center justify-between">
+                    <p class="text-sm font-semibold text-indigo-700">Current assignment</p>
+                    <span class="text-xs text-indigo-500">{{ viewItemModal()?.currentAssignment?.assignedDate ? (viewItemModal()?.currentAssignment?.assignedDate | date:'medium') : '—' }}</span>
+                  </header>
+                  <ul class="mt-2 space-y-1 text-xs text-indigo-700">
+                    <li><strong>Developer:</strong> {{ developerMap().get(extractAssignmentId(viewItemModal()?.currentAssignment?.developer) ?? '')?.developerName ?? viewItemModal()?.currentAssignment?.developer }}</li>
+                    <li><strong>Project:</strong> {{ projectMap().get(extractAssignmentId(viewItemModal()?.currentAssignment?.project) ?? '')?.projectName ?? viewItemModal()?.currentAssignment?.project }}</li>
+                    <li><strong>Camera:</strong> {{ cameraMap().get(extractAssignmentId(viewItemModal()?.currentAssignment?.camera) ?? '')?.cameraDescription ?? viewItemModal()?.currentAssignment?.camera }}</li>
+                    @if (viewItemModal()?.currentAssignment?.notes) {
+                      <li><strong>Notes:</strong> {{ viewItemModal()?.currentAssignment?.notes }}</li>
+                    }
+                  </ul>
+                </article>
+              }
+
+              @for (entry of (viewItemModal()?.assignmentHistory ?? []); track entry.assignedDate) {
+                <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <header class="flex items-center justify-between">
+                    <p class="text-sm font-semibold text-slate-900">Previous assignment</p>
+                    <span class="text-xs text-slate-500">{{ entry.assignedDate ? (entry.assignedDate | date:'medium') : '—' }}</span>
+                  </header>
+                  <ul class="mt-2 space-y-1 text-xs text-slate-600">
+                    <li><strong>Developer:</strong> {{ developerMap().get(extractAssignmentId(entry.developer) ?? '')?.developerName ?? entry.developer }}</li>
+                    <li><strong>Project:</strong> {{ projectMap().get(extractAssignmentId(entry.project) ?? '')?.projectName ?? entry.project }}</li>
+                    <li><strong>Camera:</strong> {{ cameraMap().get(extractAssignmentId(entry.camera) ?? '')?.cameraDescription ?? entry.camera }}</li>
+                    <li><strong>Removed:</strong> {{ entry.removedDate ? (entry.removedDate | date:'medium') : '—' }}</li>
+                    <li><strong>Reason:</strong> {{ entry.removalReason ?? '—' }}</li>
+                    @if (entry.notes) {
+                      <li><strong>Notes:</strong> {{ entry.notes }}</li>
+                    }
+                  </ul>
+                </article>
+              }
+            }
+          </div>
+        </section>
+
+        <section class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-slate-900">User assignment history</h3>
+            <span class="text-xs text-slate-500">Newest first</span>
+          </div>
+
+          <div class="max-h-60 space-y-3 overflow-y-auto rounded-2xl border border-slate-100 bg-white p-4">
+            @if ((viewItemModal()?.currentUserAssignment || null) === null && !(viewItemModal()?.userAssignmentHistory?.length)) {
+              <p class="text-sm text-slate-500">No user assignments yet.</p>
+            } @else {
+              @if (viewItemModal()?.currentUserAssignment) {
+                <article class="rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
+                  <header class="flex items-center justify-between">
+                    <p class="text-sm font-semibold text-sky-700">Current user</p>
+                    <span class="text-xs text-sky-500">{{ viewItemModal()?.currentUserAssignment?.assignedDate ? (viewItemModal()?.currentUserAssignment?.assignedDate | date:'medium') : '—' }}</span>
+                  </header>
+                  <ul class="mt-2 space-y-1 text-xs text-sky-700">
+                    <li><strong>Name:</strong> {{ viewItemModal()?.currentUserAssignment?.userName ?? '—' }}</li>
+                    @if (viewItemModal()?.currentUserAssignment?.notes) {
+                      <li><strong>Notes:</strong> {{ viewItemModal()?.currentUserAssignment?.notes }}</li>
+                    }
+                  </ul>
+                </article>
+              }
+
+              @for (entry of (viewItemModal()?.userAssignmentHistory ?? []); track entry.assignedDate) {
+                <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <header class="flex items-center justify-between">
+                    <p class="text-sm font-semibold text-slate-900">Previous user</p>
+                    <span class="text-xs text-slate-500">{{ entry.assignedDate ? (entry.assignedDate | date:'medium') : '—' }}</span>
+                  </header>
+                  <ul class="mt-2 space-y-1 text-xs text-slate-600">
+                    <li><strong>Name:</strong> {{ entry.userName ?? '—' }}</li>
+                    <li><strong>Removed:</strong> {{ entry.removedDate ? (entry.removedDate | date:'medium') : '—' }}</li>
+                    <li><strong>Reason:</strong> {{ entry.removalReason ?? '—' }}</li>
+                    @if (entry.notes) {
+                      <li><strong>Notes:</strong> {{ entry.notes }}</li>
+                    }
+                  </ul>
+                </article>
+              }
+            }
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+}

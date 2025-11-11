@@ -17,5 +17,8 @@ export interface AuthenticatedUser {
   accessibleServices?: string[];
   createdAt?: string;
   lastLoginAt?: string;
+  phone?: string;
+  status?: string;
+  [key: string]: unknown;
 }
 

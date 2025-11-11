@@ -1,5 +1,5 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://api.lsl-operation.com',
+  apiUrl: 'https://lsl-platform.com/backend/api',
 };
 
