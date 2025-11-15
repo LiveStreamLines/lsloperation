@@ -1,5 +1,5 @@
 <div class="flex min-h-screen bg-slate-100 text-slate-900">
-  <aside class="hidden w-72 flex-shrink-0 flex-col border-r border-slate-200 bg-white px-6 py-8 lg:flex">
+  <aside class="hidden w-72 flex-shrink-0 flex-col border-r border-slate-200 bg-sky-50 px-6 py-8 lg:flex">
     <div class="flex items-center gap-3">
       <img src="/lsl.svg" alt="LSL Operation" class="h-10 w-auto" />
       <div>
@@ -67,19 +67,7 @@
         <img src="/lsl.svg" alt="LSL Operation" class="h-8 w-auto" />
       </div>
 
-      <div class="hidden items-center gap-3 lg:flex">
-        <div class="space-y-1">
-          <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Next maintenance window</div>
-          <div class="text-sm font-medium text-slate-900">Friday 22:00 GST · 5 hours</div>
-        </div>
-        <div class="h-10 w-px bg-slate-200"></div>
-        <div class="space-y-1">
-          <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Live uptime</div>
-          <div class="text-sm font-medium text-emerald-600">99.982%</div>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-4">
+      <div class="ml-auto flex items-center gap-4">
         @if (user()) {
           <div class="hidden flex-col text-right text-sm lg:flex">
             <span class="font-semibold text-slate-900">{{ user()?.name }}</span>
@@ -112,19 +100,19 @@
 @if (mobileSidebarOpen()) {
   <div class="fixed inset-0 z-40 lg:hidden">
     <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" (click)="closeSidebar()"></div>
-    <div class="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-slate-800 bg-slate-950 px-6 py-8 text-white shadow-2xl">
+    <div class="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-slate-200 bg-sky-50 px-6 py-8 text-slate-900 shadow-2xl">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
           <img src="/lsl.svg" alt="LSL Operation" class="h-9 w-auto" />
           <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-white/60">LSL Operation</p>
-            <p class="text-lg font-bold">Control Center</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">LSL Operation</p>
+            <p class="text-lg font-bold text-slate-900">Control Center</p>
           </div>
         </div>
         <button
           type="button"
           (click)="closeSidebar()"
-          class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white"
+          class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm"
           aria-label="Close navigation"
         >
           <span class="sr-only">Close navigation</span>
@@ -139,25 +127,25 @@
           <a
             [routerLink]="item.path"
             (click)="closeSidebar()"
-            routerLinkActive="bg-white/10"
+            routerLinkActive="bg-white/80"
             #rlaMobile="routerLinkActive"
-            class="flex flex-col gap-1 rounded-2xl px-5 py-3 text-sm transition hover:bg-white/5"
+            class="flex flex-col gap-1 rounded-2xl px-5 py-3 text-sm text-slate-700 transition hover:bg-white"
           >
-            <span class="font-semibold tracking-wide">{{ item.label }}</span>
-            <span class="text-xs text-white/60">{{ item.description }}</span>
+            <span class="font-semibold tracking-wide" [class.text-slate-900]="rlaMobile.isActive">{{ item.label }}</span>
+            <span class="text-xs text-slate-500">{{ item.description }}</span>
           </a>
         }
       </nav>
 
-      <div class="mt-auto rounded-2xl border border-white/10 bg-white/5 px-5 py-6 text-sm">
-        <p class="font-semibold uppercase tracking-wide text-white/60">Signed in as</p>
-        <p class="mt-2 text-base font-semibold">{{ user()?.name ?? 'Unknown User' }}</p>
-        <p class="text-xs text-white/50">{{ user()?.email }}</p>
+      <div class="mt-auto rounded-2xl border border-slate-200 bg-white/70 px-5 py-6 text-sm text-slate-600">
+        <p class="font-semibold uppercase tracking-wide text-slate-500">Signed in as</p>
+        <p class="mt-2 text-base font-semibold text-slate-900">{{ user()?.name ?? 'Unknown User' }}</p>
+        <p class="text-xs text-slate-500">{{ user()?.email }}</p>
         <button
           type="button"
           (click)="onLogout()"
           [disabled]="isSigningOut()"
-          class="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-white/20 disabled:opacity-60"
+          class="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow transition hover:bg-indigo-500 disabled:opacity-60"
         >
           Sign out
         </button>

@@ -50,6 +50,16 @@ export class DeveloperService {
     );
   }
 
+  create(formData: FormData): Observable<Developer> {
+    this.clearCache();
+    return this.http.post<Developer>(`${this.baseUrl}/`, formData);
+  }
+
+  update(id: string, formData: FormData): Observable<Developer> {
+    this.clearCache();
+    return this.http.put<Developer>(`${this.baseUrl}/${id}`, formData);
+  }
+
   clearCache(): void {
     this.cache = null;
     this.request$ = undefined;

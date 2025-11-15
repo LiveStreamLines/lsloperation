@@ -37,6 +37,8 @@ export interface InventoryItem {
   currentAssignment?: InventoryAssignment | null;
   userAssignmentHistory?: InventoryUserAssignment[];
   currentUserAssignment?: InventoryUserAssignment | null;
+  assignedCameraId?: string;
+  assignedCameraName?: string;
   [key: string]: unknown;
 }
 

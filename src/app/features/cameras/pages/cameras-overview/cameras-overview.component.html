@@ -1,99 +1,191 @@
-<section class="space-y-10">
+<section class="space-y-6">
   <header class="flex flex-col gap-3 rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">Live operations</p>
-        <h1 class="mt-1 text-3xl font-bold text-slate-900">Camera intelligence</h1>
+        <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">Camera management</p>
+        <h1 class="mt-1 text-3xl font-bold text-slate-900">Cameras</h1>
       </div>
-      <button
-        type="button"
-        class="inline-flex items-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
-      >
-        Launch wallboard
-      </button>
     </div>
     <p class="text-sm text-slate-500">
-      Track stream quality, uptime, and alerting per node. Automate installation checklists and invoice-ready
-      documentation from a single source of truth.
+      Manage cameras, track status, and organize by developer and project. Add new cameras or edit existing ones.
     </p>
   </header>
 
-  <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Cameras online</p>
-      <p class="mt-2 text-4xl font-bold text-slate-900">1,247</p>
-      <p class="mt-1 text-xs text-emerald-600">+38 activated this week</p>
-    </article>
-    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Flagged streams</p>
-      <p class="mt-2 text-4xl font-bold text-slate-900">7</p>
-      <p class="mt-1 text-xs text-amber-600">Requires maintenance follow-up</p>
-    </article>
-    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Average uptime</p>
-      <p class="mt-2 text-4xl font-bold text-slate-900">99.4%</p>
-      <p class="mt-1 text-xs text-slate-500">Trailing 30-day window</p>
-    </article>
-    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Last photo ingest</p>
-      <p class="mt-2 text-4xl font-bold text-slate-900">42s</p>
-      <p class="mt-1 text-xs text-slate-500">Latency across network</p>
-    </article>
-  </section>
-
-  <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-      <div>
-        <h2 class="text-xl font-semibold text-slate-900">Network health</h2>
-        <p class="text-sm text-slate-500">Prioritise remediation and surface degraded nodes instantly.</p>
-      </div>
-      <div class="flex gap-2">
-        <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-          Download manifest
-        </button>
-        <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-          Maintenance view
-        </button>
-      </div>
-    </div>
-
-    <div class="mt-6 overflow-hidden rounded-2xl border border-slate-100">
-      <table class="min-w-full divide-y divide-slate-100 text-left text-sm">
-        <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          <tr>
-            <th class="px-5 py-3">Camera</th>
-            <th class="px-5 py-3">Project</th>
-            <th class="px-5 py-3">Developer</th>
-            <th class="px-5 py-3">Last frame</th>
-            <th class="px-5 py-3">Uptime</th>
-            <th class="px-5 py-3">Status</th>
-            <th class="px-5 py-3 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100 bg-white">
-          @for (camera of cameraNodes; track camera.name) {
-            <tr class="transition hover:bg-slate-50/70">
-              <td class="px-5 py-4">
-                <div class="font-semibold text-slate-900">{{ camera.name }}</div>
-              </td>
-              <td class="px-5 py-4 text-sm text-slate-600">{{ camera.project }}</td>
-              <td class="px-5 py-4 text-sm text-slate-500">{{ camera.developer }}</td>
-              <td class="px-5 py-4 text-sm text-slate-600">{{ camera.lastFrame }}</td>
-              <td class="px-5 py-4 text-sm font-semibold text-slate-900">{{ camera.uptime }}</td>
-              <td class="px-5 py-4">
-                <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold" [class]="statusBadge(camera.status)">
-                  {{ camera.status }}
-                </span>
-              </td>
-              <td class="px-5 py-4 text-right">
-                <button class="rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Inspect
-                </button>
-              </td>
-            </tr>
+  <div class="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-wrap items-center gap-4">
+      <label class="flex flex-col gap-2 text-sm text-slate-600">
+        <span class="font-semibold text-slate-800">Select Developer</span>
+        <select
+          class="w-64 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          [value]="selectedDeveloperId() ?? ''"
+          (change)="onDeveloperChange($any($event.target).value)"
+        >
+          <option value="">All developers</option>
+          @for (developer of sortedDevelopers(); track developer._id) {
+            <option [value]="developer._id">{{ developer.developerName }}</option>
           }
-        </tbody>
-      </table>
+        </select>
+      </label>
+
+      @if (selectedDeveloperId() && sortedProjects().length > 0) {
+        <label class="flex flex-col gap-2 text-sm text-slate-600">
+          <span class="font-semibold text-slate-800">Select Project</span>
+          <select
+            class="w-64 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            [value]="selectedProjectId() ?? ''"
+            (change)="onProjectChange($any($event.target).value)"
+          >
+            <option value="">All projects</option>
+            @for (project of sortedProjects(); track project._id) {
+              <option [value]="project._id">{{ project.projectName }}</option>
+            }
+          </select>
+        </label>
+      }
+
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+        (click)="openAddCamera()"
+      >
+        <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
+          <path d="M10.5 4a.5.5 0 10-1 0v5.5H4a.5.5 0 000 1h5.5V16a.5.5 0 001 0v-5.5H16a.5.5 0 000-1h-5.5V4z" />
+        </svg>
+        Add New
+      </button>
     </div>
-  </section>
+
+    <label class="flex flex-col gap-2 text-sm text-slate-600">
+      <span class="sr-only">Search Cameras</span>
+      <input
+        type="text"
+        class="w-64 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        placeholder="Search cameras..."
+        [value]="searchTerm()"
+        (input)="onSearchChange($any($event.target).value)"
+      />
+    </label>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="rounded-3xl bg-rose-50 p-4 text-sm text-rose-700 ring-1 ring-rose-200">
+      {{ errorMessage() }}
+    </div>
+  }
+
+  @if (isLoading()) {
+    <div class="flex items-center justify-center rounded-3xl bg-white p-12 shadow-sm ring-1 ring-slate-200">
+      <div class="text-center">
+        <div class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"></div>
+        <p class="mt-4 text-sm text-slate-600">Loading cameras...</p>
+      </div>
+    </div>
+  } @else if (filteredCameras().length === 0) {
+    <div class="rounded-3xl bg-white p-12 text-center shadow-sm ring-1 ring-slate-200">
+      <p class="text-slate-600">No cameras found.</p>
+    </div>
+  } @else {
+    <div class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-100 text-left text-sm">
+          <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <tr>
+              <th class="px-6 py-3">Camera Name</th>
+              @if (displayedColumns().includes('developer')) {
+                <th class="px-6 py-3">Developer</th>
+                <th class="px-6 py-3">Project</th>
+              }
+              <th class="px-6 py-3">Country</th>
+              <th class="px-6 py-3">Server Folder</th>
+              <th class="px-6 py-3">Created Date</th>
+              <th class="px-6 py-3">Installation Date</th>
+              <th class="px-6 py-3">Status</th>
+              <th class="px-6 py-3">Block/Unblock</th>
+              <th class="px-6 py-3 text-right">Actions</th>
+              <th class="px-6 py-3 text-right">Download</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 bg-white">
+            @for (camera of filteredCameras(); track camera._id) {
+              <tr
+                class="transition hover:bg-slate-50/70"
+                [class.opacity-60]="camera.blocked"
+                [class.bg-slate-50]="camera.blocked"
+              >
+                <td class="px-6 py-4">
+                  <div class="font-semibold text-slate-900">{{ camera.camera || '—' }}</div>
+                </td>
+                @if (displayedColumns().includes('developer')) {
+                  <td class="px-6 py-4 text-sm text-slate-600">
+                    {{ getDeveloperName(camera.developer) }}
+                  </td>
+                  <td class="px-6 py-4 text-sm text-slate-600">
+                    {{ getProjectName(camera.project) }}
+                  </td>
+                }
+                <td class="px-6 py-4 text-sm text-slate-600">{{ camera.country || '—' }}</td>
+                <td class="px-6 py-4 text-sm text-slate-600">{{ camera.serverFolder || '—' }}</td>
+                <td class="px-6 py-4 text-sm text-slate-600">{{ formatDate(camera.createdDate) }}</td>
+                <td class="px-6 py-4 text-sm text-slate-600">
+                  {{ camera.installedDate ? formatDate(camera.installedDate) : 'Not Installed' }}
+                </td>
+                <td class="px-6 py-4">
+                  <span
+                    class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+                    [class]="getStatusBadgeClass(camera.status)"
+                  >
+                    {{ camera.status || 'Pending' }}
+                  </span>
+                </td>
+                <td class="px-6 py-4">
+                  <button
+                    type="button"
+                    class="rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    [class.bg-rose-600]="camera.blocked"
+                    [class.border-rose-600]="camera.blocked"
+                    [class.text-white]="camera.blocked"
+                    [class.hover:bg-rose-700]="camera.blocked"
+                    (click)="toggleBlockStatus(camera)"
+                  >
+                    {{ camera.blocked ? 'Unblock' : 'Block' }}
+                  </button>
+                </td>
+                <td class="px-6 py-4 text-right">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    (click)="openEditCamera(camera._id)"
+                    [disabled]="camera.blocked"
+                  >
+                    <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
+                      <path
+                        d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 1a7 7 0 110 14 7 7 0 010-14zm0 2a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 000-2H11V5a1 1 0 00-1-1z"
+                      />
+                    </svg>
+                    Edit
+                  </button>
+                </td>
+                <td class="px-6 py-4 text-right">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    (click)="downloadConfig(camera)"
+                    [disabled]="camera.blocked"
+                  >
+                    <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
+                      <path
+                        d="M10 2a1 1 0 011 1v8.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 11.586V3a1 1 0 011-1z"
+                      />
+                      <path d="M3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" />
+                    </svg>
+                    Download
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
 </section>

@@ -1,0 +1,217 @@
+<section class="space-y-6">
+  <header class="flex flex-col gap-3 rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">Camera management</p>
+        <h1 class="mt-1 text-3xl font-bold text-slate-900">
+          {{ isEditMode() ? 'Edit Camera' : 'Add New Camera' }}
+        </h1>
+      </div>
+    </div>
+  </header>
+
+  @if (isLoading()) {
+    <div class="flex items-center justify-center rounded-3xl bg-white p-12 shadow-sm ring-1 ring-slate-200">
+      <div class="text-center">
+        <div class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"></div>
+        <p class="mt-4 text-sm text-slate-600">Loading...</p>
+      </div>
+    </div>
+  } @else {
+    <div class="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
+      <form class="space-y-6" (ngSubmit)="saveCamera()">
+        <!-- Developer and Project Selection -->
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Developer <span class="text-rose-500">*</span></span>
+            <select
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+              [ngModel]="cameraForm().developer"
+              (ngModelChange)="onDeveloperChange($event)"
+              [ngModelOptions]="{standalone: true}"
+              [disabled]="isEditMode()"
+              required
+            >
+              <option value="">Select developer</option>
+              @for (developer of sortedDevelopers(); track developer._id) {
+                <option [value]="developer._id">{{ developer.developerName }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Project <span class="text-rose-500">*</span></span>
+            <select
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+              [ngModel]="cameraForm().project"
+              (ngModelChange)="updateFormField('project', $event)"
+              [ngModelOptions]="{standalone: true}"
+              [disabled]="isEditMode() || !cameraForm().developer"
+              required
+            >
+              <option value="">Select project</option>
+              @for (project of filteredProjects(); track project._id) {
+                <option [value]="project._id">{{ project.projectName }}</option>
+              }
+            </select>
+          </label>
+        </div>
+
+        <!-- Camera Details -->
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Camera Name <span class="text-rose-500">*</span></span>
+            <input
+              type="text"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [ngModel]="cameraForm().camera"
+              (ngModelChange)="updateFormField('camera', $event)"
+              [ngModelOptions]="{standalone: true}"
+              required
+            />
+          </label>
+
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Index <span class="text-rose-500">*</span></span>
+            <input
+              type="number"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [ngModel]="cameraForm().cindex"
+              (ngModelChange)="updateFormField('cindex', +$event)"
+              [ngModelOptions]="{standalone: true}"
+              required
+            />
+          </label>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Description</span>
+            <input
+              type="text"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [ngModel]="cameraForm().cameraDescription"
+              (ngModelChange)="updateFormField('cameraDescription', $event)"
+              [ngModelOptions]="{standalone: true}"
+            />
+          </label>
+
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Server Folder</span>
+            <input
+              type="text"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [ngModel]="cameraForm().serverFolder"
+              (ngModelChange)="updateFormField('serverFolder', $event)"
+              [ngModelOptions]="{standalone: true}"
+            />
+          </label>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Latitude <span class="text-rose-500">*</span></span>
+            <input
+              type="text"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [ngModel]="cameraForm().lat"
+              (ngModelChange)="updateFormField('lat', $event)"
+              [ngModelOptions]="{standalone: true}"
+              required
+            />
+          </label>
+
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Longitude <span class="text-rose-500">*</span></span>
+            <input
+              type="text"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [ngModel]="cameraForm().lng"
+              (ngModelChange)="updateFormField('lng', $event)"
+              [ngModelOptions]="{standalone: true}"
+              required
+            />
+          </label>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Country <span class="text-rose-500">*</span></span>
+            <select
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [ngModel]="cameraForm().country"
+              (ngModelChange)="updateFormField('country', $event)"
+              [ngModelOptions]="{standalone: true}"
+              required
+            >
+              <option value="">Select country</option>
+              @for (country of countryOptions; track country) {
+                <option [value]="country">{{ country }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Server <span class="text-rose-500">*</span></span>
+            <select
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              [ngModel]="cameraForm().server"
+              (ngModelChange)="updateFormField('server', $event)"
+              [ngModelOptions]="{standalone: true}"
+              required
+            >
+              <option value="">Select server</option>
+              @for (server of serverOptions; track server) {
+                <option [value]="server">{{ server }}</option>
+              }
+            </select>
+          </label>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <input
+            type="checkbox"
+            class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+            [ngModel]="cameraForm().isActive"
+            (ngModelChange)="updateFormField('isActive', $event)"
+            [ngModelOptions]="{standalone: true}"
+            id="isActive"
+          />
+          <label for="isActive" class="text-sm font-semibold text-slate-800">Active</label>
+        </div>
+
+        @if (cameraForm().error) {
+          <div class="rounded-2xl bg-rose-50 p-4 text-sm text-rose-700 ring-1 ring-rose-200">
+            {{ cameraForm().error }}
+          </div>
+        }
+
+        <div class="flex items-center justify-end gap-4">
+          <button
+            type="button"
+            class="rounded-2xl border border-slate-200 px-6 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+            (click)="cancel()"
+            [disabled]="cameraForm().isSaving"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="rounded-2xl bg-indigo-600 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+            [disabled]="cameraForm().isSaving"
+          >
+            @if (cameraForm().isSaving) {
+              <span class="inline-flex items-center gap-2">
+                <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                Saving...
+              </span>
+            } @else {
+              {{ isEditMode() ? 'Update Camera' : 'Add Camera' }}
+            }
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+</section>
+

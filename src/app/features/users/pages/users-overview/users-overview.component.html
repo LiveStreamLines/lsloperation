@@ -1,102 +1,272 @@
-<section class="space-y-10">
+<section class="space-y-6">
   <header class="flex flex-col gap-3 rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">
-          Identity & access
-        </p>
-        <h1 class="mt-1 text-3xl font-bold text-slate-900">User management</h1>
+        <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">User management</p>
+        <h1 class="mt-1 text-3xl font-bold text-slate-900">Users</h1>
       </div>
       <button
         type="button"
-        class="inline-flex items-center rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-300 transition hover:bg-indigo-500"
+        class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-500"
+        (click)="openAddUser()"
       >
-        Invite teammate
+        <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
+          <path d="M10.5 4a.5.5 0 10-1 0v5.5H4a.5.5 0 000 1h5.5V16a.5.5 0 001 0v-5.5H16a.5.5 0 000-1h-5.5V4z" />
+        </svg>
+        Add New User
       </button>
     </div>
     <p class="text-sm text-slate-500">
-      Centralise onboarding, enforce role-based access, and track authentication history across developers,
-      projects, and camera networks.
+      Manage users, assign roles, and control access to developers, projects, and cameras.
     </p>
   </header>
 
-  <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Active seats</p>
-      <p class="mt-2 text-3xl font-bold text-slate-900">128</p>
-      <p class="mt-1 text-xs text-emerald-600">+6 in the last 30 days</p>
-    </article>
-    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">MFA coverage</p>
-      <p class="mt-2 text-3xl font-bold text-slate-900">92%</p>
-      <p class="mt-1 text-xs text-slate-500">4 users awaiting setup</p>
-    </article>
-    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Last login</p>
-      <p class="mt-2 text-3xl font-bold text-slate-900">5m</p>
-      <p class="mt-1 text-xs text-slate-500">Average time since last activity</p>
-    </article>
-    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Suspicious events</p>
-      <p class="mt-2 text-3xl font-bold text-slate-900">0</p>
-      <p class="mt-1 text-xs text-emerald-600">No anomalies detected</p>
-    </article>
-  </section>
-
-  <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-      <div>
-        <h2 class="text-xl font-semibold text-slate-900">Recently active users</h2>
-        <p class="text-sm text-slate-500">Monitor session history and enforce access policies</p>
-      </div>
-      <div class="flex gap-2">
-        <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-          Export CSV
-        </button>
-        <button class="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-          Audit trail
-        </button>
-      </div>
-    </div>
-
-    <div class="mt-6 overflow-hidden rounded-2xl border border-slate-100">
-      <table class="min-w-full divide-y divide-slate-100 text-left text-sm">
-        <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          <tr>
-            <th class="px-5 py-3">Name</th>
-            <th class="px-5 py-3">Role</th>
-            <th class="px-5 py-3">Last login</th>
-            <th class="px-5 py-3">Status</th>
-            <th class="px-5 py-3 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100 bg-white">
-          @for (user of userSummaries; track user.email) {
-            <tr class="transition hover:bg-slate-50/70">
-              <td class="px-5 py-4">
-                <div class="font-semibold text-slate-900">{{ user.name }}</div>
-                <div class="text-xs text-slate-500">{{ user.email }}</div>
-              </td>
-              <td class="px-5 py-4">
-                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                  {{ user.role }}
-                </span>
-              </td>
-              <td class="px-5 py-4 text-slate-600">{{ user.lastLogin }}</td>
-              <td class="px-5 py-4">
-                <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold" [class]="badgeClass(user.status)">
-                  {{ user.status }}
-                </span>
-              </td>
-              <td class="px-5 py-4 text-right">
-                <button class="rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Manage
-                </button>
-              </td>
-            </tr>
+  <div class="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-wrap items-center gap-4">
+      <label class="flex flex-col gap-2 text-sm text-slate-600">
+        <span class="font-semibold text-slate-800">Filter by Developer</span>
+        <select
+          class="w-64 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          [value]="selectedDeveloperId() ?? ''"
+          (change)="onDeveloperChange($any($event.target).value)"
+        >
+          @for (developer of sortedDevelopers(); track developer._id) {
+            <option [value]="developer._id">{{ developer.developerName }}</option>
           }
-        </tbody>
-      </table>
+        </select>
+      </label>
+
+      @if (projects().length > 0) {
+        <label class="flex flex-col gap-2 text-sm text-slate-600">
+          <span class="font-semibold text-slate-800">Filter by Project</span>
+          <select
+            class="w-64 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            [value]="selectedProjectId() ?? ''"
+            (change)="onProjectChange($any($event.target).value)"
+          >
+            <option value="ALL">All Projects</option>
+            @for (project of projects(); track project._id) {
+              <option [value]="project._id">{{ project.projectName }}</option>
+            }
+          </select>
+        </label>
+      }
+
+      @if (cameras().length > 0) {
+        <label class="flex flex-col gap-2 text-sm text-slate-600">
+          <span class="font-semibold text-slate-800">Filter by Camera</span>
+          <select
+            class="w-64 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            [value]="selectedCameraId() ?? ''"
+            (change)="onCameraChange($any($event.target).value)"
+          >
+            <option value="ALL">All Cameras</option>
+            @for (camera of cameras(); track camera._id) {
+              <option [value]="camera._id">{{ camera.camera || camera.cameraDescription || '—' }}</option>
+            }
+          </select>
+        </label>
+      }
     </div>
-  </section>
+
+    <label class="flex flex-col gap-2 text-sm text-slate-600">
+      <span class="sr-only">Search Users</span>
+      <input
+        type="text"
+        class="w-64 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        placeholder="Search by name, email, or role..."
+        [value]="searchTerm()"
+        (input)="onSearchChange($any($event.target).value)"
+      />
+    </label>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="rounded-3xl bg-rose-50 p-4 text-sm text-rose-700 ring-1 ring-rose-200">
+      {{ errorMessage() }}
+    </div>
+  }
+
+  @if (isLoading()) {
+    <div class="flex items-center justify-center rounded-3xl bg-white p-12 shadow-sm ring-1 ring-slate-200">
+      <div class="text-center">
+        <div class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"></div>
+        <p class="mt-4 text-sm text-slate-600">Loading users...</p>
+      </div>
+    </div>
+  } @else if (filteredUsers().length === 0) {
+    <div class="rounded-3xl bg-white p-12 text-center shadow-sm ring-1 ring-slate-200">
+      <p class="text-slate-600">No users found.</p>
+    </div>
+  } @else {
+    <div class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-100 text-left text-sm">
+          <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <tr>
+              <th
+                class="cursor-pointer px-6 py-3 transition hover:bg-slate-100"
+                (click)="sortBy('name')"
+              >
+                <div class="flex items-center gap-2">
+                  Name
+                  @if (currentSortColumn() === 'name') {
+                    <span>{{ currentSortDirection() === 'asc' ? '↑' : '↓' }}</span>
+                  }
+                </div>
+              </th>
+              <th
+                class="cursor-pointer px-6 py-3 transition hover:bg-slate-100"
+                (click)="sortBy('email')"
+              >
+                <div class="flex items-center gap-2">
+                  Email
+                  @if (currentSortColumn() === 'email') {
+                    <span>{{ currentSortDirection() === 'asc' ? '↑' : '↓' }}</span>
+                  }
+                </div>
+              </th>
+              <th
+                class="cursor-pointer px-6 py-3 transition hover:bg-slate-100"
+                (click)="sortBy('role')"
+              >
+                <div class="flex items-center gap-2">
+                  Role
+                  @if (currentSortColumn() === 'role') {
+                    <span>{{ currentSortDirection() === 'asc' ? '↑' : '↓' }}</span>
+                  }
+                </div>
+              </th>
+              <th
+                class="cursor-pointer px-6 py-3 transition hover:bg-slate-100"
+                (click)="sortBy('status')"
+              >
+                <div class="flex items-center gap-2">
+                  Status
+                  @if (currentSortColumn() === 'status') {
+                    <span>{{ currentSortDirection() === 'asc' ? '↑' : '↓' }}</span>
+                  }
+                </div>
+              </th>
+              <th
+                class="cursor-pointer px-6 py-3 transition hover:bg-slate-100"
+                (click)="sortBy('lastLogin')"
+              >
+                <div class="flex items-center gap-2">
+                  Last Login
+                  @if (currentSortColumn() === 'lastLogin') {
+                    <span>{{ currentSortDirection() === 'asc' ? '↑' : '↓' }}</span>
+                  }
+                </div>
+              </th>
+              <th
+                class="cursor-pointer px-6 py-3 transition hover:bg-slate-100"
+                (click)="sortBy('createdDate')"
+              >
+                <div class="flex items-center gap-2">
+                  Created Date
+                  @if (currentSortColumn() === 'createdDate') {
+                    <span>{{ currentSortDirection() === 'asc' ? '↑' : '↓' }}</span>
+                  }
+                </div>
+              </th>
+              <th class="px-6 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 bg-white">
+            @for (user of paginatedUsers(); track user._id) {
+              <tr class="transition hover:bg-slate-50/70">
+                <td class="px-6 py-4">
+                  <div class="font-semibold text-slate-900">{{ user.name || '—' }}</div>
+                </td>
+                <td class="px-6 py-4 text-sm text-slate-600">{{ user.email || '—' }}</td>
+                <td class="px-6 py-4 text-sm text-slate-600">{{ user.role || '—' }}</td>
+                <td class="px-6 py-4">
+                  <span
+                    class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+                    [class]="getStatusBadgeClass(user.status)"
+                  >
+                    {{ user.status || '—' }}
+                  </span>
+                </td>
+                <td class="px-6 py-4 text-sm text-slate-600">{{ formatDate(user.LastLoginTime) }}</td>
+                <td class="px-6 py-4 text-sm text-slate-600">{{ formatDate(user.createdDate) }}</td>
+                <td class="px-6 py-4 text-right">
+                  <div class="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-1 rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                      (click)="openEditUser(user._id)"
+                    >
+                      <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
+                        <path
+                          d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"
+                        />
+                      </svg>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-1 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                      (click)="deleteUser(user._id)"
+                    >
+                      <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
+                        <path
+                          fill-rule="evenodd"
+                          d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-4">
+        <div class="text-sm text-slate-600">
+          Showing {{ currentPage() * pageSize() + 1 }} to
+          {{ Math.min((currentPage() + 1) * pageSize(), filteredUsers().length) }} of
+          {{ filteredUsers().length }} users
+        </div>
+        <div class="flex items-center gap-2">
+          <select
+            class="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            [value]="pageSize()"
+            (change)="onPageSizeChange(+$any($event.target).value)"
+          >
+            <option [value]="5">5 per page</option>
+            <option [value]="10">10 per page</option>
+            <option [value]="20">20 per page</option>
+          </select>
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              class="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              (click)="onPageChange(currentPage() - 1)"
+              [disabled]="currentPage() === 0"
+            >
+              Previous
+            </button>
+            <span class="px-3 py-1 text-sm text-slate-600">
+              Page {{ currentPage() + 1 }} of {{ totalPages() }}
+            </span>
+            <button
+              type="button"
+              class="rounded-2xl border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              (click)="onPageChange(currentPage() + 1)"
+              [disabled]="currentPage() >= totalPages() - 1"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
 </section>

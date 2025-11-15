@@ -266,18 +266,31 @@ export class InventoryOverviewComponent implements OnInit {
   });
 
   readonly viewItemModal = signal<InventoryItem | null>(null);
+  readonly editEstimatedAgeState = signal<{
+    itemId: string | null;
+    estimatedAge: string;
+    isSaving: boolean;
+    error: string | null;
+  }>({
+    itemId: null,
+    estimatedAge: '',
+    isSaving: false,
+    error: null,
+  });
 
   readonly createDeviceModalOpen = signal(false);
   readonly createDeviceState = signal<{
     type: string;
     serialNumber: string;
     model: string;
+    estimatedAge: string;
     error: string | null;
     isSaving: boolean;
   }>({
     type: '',
     serialNumber: '',
     model: '',
+    estimatedAge: '',
     error: null,
     isSaving: false,
   });
@@ -1106,6 +1119,7 @@ export class InventoryOverviewComponent implements OnInit {
       type: this.deviceTypes()[0]?.name ?? '',
       serialNumber: '',
       model: '',
+      estimatedAge: '',
       error: null,
       isSaving: false,
     });
@@ -1158,6 +1172,13 @@ export class InventoryOverviewComponent implements OnInit {
     }));
   }
 
+  onCreateDeviceEstimatedAgeChange(value: string): void {
+    this.createDeviceState.update((state) => ({
+      ...state,
+      estimatedAge: value,
+    }));
+  }
+
   saveCreateDevice(): void {
     const state = this.createDeviceState();
     if (!state.type.trim()) {
@@ -1182,6 +1203,8 @@ export class InventoryOverviewComponent implements OnInit {
       isSaving: true,
     }));
 
+    const estimatedAgeValue = this.toFiniteDayCount(state.estimatedAge);
+    
     const payload: Partial<InventoryItem> = {
       device: {
         type: state.type.trim(),
@@ -1193,6 +1216,7 @@ export class InventoryOverviewComponent implements OnInit {
       validityDays:
         this.deviceTypes().find((type) => type.name?.toLowerCase() === state.type.trim().toLowerCase())
           ?.validityDays ?? 365,
+      ...(estimatedAgeValue !== null && { estimatedAge: estimatedAgeValue }),
     };
 
     this.inventoryService
@@ -1492,6 +1516,13 @@ export class InventoryOverviewComponent implements OnInit {
     let total = 0;
     let hasRange = false;
 
+    // Add estimated age as initial value if present
+    const estimatedAge = this.toFiniteDayCount(item['estimatedAge']);
+    if (estimatedAge !== null && estimatedAge > 0) {
+      total += estimatedAge;
+      hasRange = true;
+    }
+
     const addRange = (start?: string, end?: string) => {
       const duration = this.calculateDurationInDays(start, end);
       if (duration > 0) {
@@ -1548,5 +1579,114 @@ export class InventoryOverviewComponent implements OnInit {
     }
 
     return null;
+  }
+
+  startEditEstimatedAge(item: InventoryItem): void {
+    const currentEstimatedAge = item['estimatedAge'];
+    const estimatedAgeString = currentEstimatedAge !== null && currentEstimatedAge !== undefined 
+      ? String(currentEstimatedAge) 
+      : '';
+    
+    this.editEstimatedAgeState.set({
+      itemId: item._id,
+      estimatedAge: estimatedAgeString,
+      isSaving: false,
+      error: null,
+    });
+  }
+
+  onEstimatedAgeChange(value: string): void {
+    this.editEstimatedAgeState.update((state) => ({
+      ...state,
+      estimatedAge: value,
+      error: null,
+    }));
+  }
+
+  cancelEditEstimatedAge(): void {
+    this.editEstimatedAgeState.set({
+      itemId: null,
+      estimatedAge: '',
+      isSaving: false,
+      error: null,
+    });
+  }
+
+  saveEstimatedAge(): void {
+    const state = this.editEstimatedAgeState();
+    if (!state.itemId) {
+      return;
+    }
+
+    const estimatedAgeValue = this.toFiniteDayCount(state.estimatedAge);
+    
+    this.editEstimatedAgeState.update((current) => ({
+      ...current,
+      isSaving: true,
+      error: null,
+    }));
+
+    const payload: Partial<InventoryItem> = {};
+    
+    if (estimatedAgeValue !== null && estimatedAgeValue > 0) {
+      payload['estimatedAge'] = estimatedAgeValue;
+    } else {
+      // If empty or 0, remove the estimated age field by setting it to null
+      payload['estimatedAge'] = null;
+    }
+
+    this.inventoryService
+      .update(state.itemId, payload)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        catchError((error) => {
+          console.error('Failed to update estimated age', error);
+          this.editEstimatedAgeState.update((current) => ({
+            ...current,
+            isSaving: false,
+            error: 'Unable to update estimated age. Please try again.',
+          }));
+          return of<InventoryItem | null>(null);
+        }),
+      )
+      .subscribe((result) => {
+        if (!result) {
+          return;
+        }
+        
+        const updatedEstimatedAge = result['estimatedAge'] ?? null;
+        
+        // Update the item in the items array
+        this.items.update((items) =>
+          items.map((item) => {
+            if (item._id === state.itemId) {
+              return { ...item, estimatedAge: updatedEstimatedAge };
+            }
+            return item;
+          }),
+        );
+        
+        // Update the view modal if it's the same item, preserving all existing data
+        this.viewItemModal.update((item) => {
+          if (item && item._id === state.itemId) {
+            return { ...item, estimatedAge: updatedEstimatedAge };
+          }
+          return item;
+        });
+        
+        // Cancel edit state to return to view mode
+        this.cancelEditEstimatedAge();
+        
+        // Reload inventory in the background to ensure consistency
+        this.loadInventory();
+      });
+  }
+
+  isEditingEstimatedAge(itemId: string): boolean {
+    return this.editEstimatedAgeState().itemId === itemId;
+  }
+
+  getCurrentEstimatedAge(item: InventoryItem): number | null {
+    return this.toFiniteDayCount(item['estimatedAge']);
   }
 }

@@ -39,6 +39,47 @@ export class InventoryService {
     return this.http.get<InventoryItem>(`${this.baseUrl}/${id}`);
   }
 
+  getByCamera(cameraId: string, cameraName?: string): Observable<InventoryItem[]> {
+    return this.getAll().pipe(
+      map((items) =>
+        items.filter((item) => {
+          if (item.assignedCameraId) {
+            return item.assignedCameraId === cameraId;
+          }
+
+          const assignmentCameraId = item.currentAssignment?.camera as string | undefined;
+          if (assignmentCameraId && assignmentCameraId === cameraId) {
+            return true;
+          }
+
+          const assignedCameraName = item.assignedCameraName ?? this.extractCameraName(item);
+          if (cameraName && assignedCameraName) {
+            return assignedCameraName.toLowerCase() === cameraName.toLowerCase();
+          }
+
+          return false;
+        }),
+      ),
+    );
+  }
+
+  private extractCameraName(item: InventoryItem): string | undefined {
+    const assignment = item.currentAssignment;
+    if (!assignment) {
+      return undefined;
+    }
+
+    if (typeof assignment.camera === 'string' && assignment.camera.length > 0 && !this.isObjectId(assignment.camera)) {
+      return assignment.camera;
+    }
+
+    return undefined;
+  }
+
+  private isObjectId(value: string): boolean {
+    return /^[a-f0-9]{24}$/i.test(value);
+  }
+
   create(item: Partial<InventoryItem>): Observable<InventoryItem> {
     return this.http.post<InventoryItem>(this.baseUrl, item);
   }

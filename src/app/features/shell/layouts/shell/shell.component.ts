@@ -60,6 +60,11 @@ export class ShellComponent {
       description: 'Fleet visibility and stream quality',
     },
     {
+      label: 'Camera monitor',
+      path: '/camera-monitor',
+      description: 'Live updates and real-time snapshots',
+    },
+    {
       label: 'Inventory',
       path: '/inventory',
       description: 'Device lifecycle and logistics',

@@ -28,6 +28,20 @@ const routes: Routes = [
           ),
       },
       {
+        path: 'users/add',
+        loadComponent: () =>
+          import('@features/users/pages/user-form/user-form.component').then(
+            (m) => m.UserFormComponent,
+          ),
+      },
+      {
+        path: 'users/edit/:id',
+        loadComponent: () =>
+          import('@features/users/pages/user-form/user-form.component').then(
+            (m) => m.UserFormComponent,
+          ),
+      },
+      {
         path: 'developers',
         loadComponent: () =>
           import('@features/developers/pages/developers-overview/developers-overview.component').then(
@@ -46,6 +60,34 @@ const routes: Routes = [
         loadComponent: () =>
           import('@features/cameras/pages/cameras-overview/cameras-overview.component').then(
             (m) => m.CamerasOverviewComponent,
+          ),
+      },
+      {
+        path: 'camera-form/:id',
+        loadComponent: () =>
+          import('@features/cameras/pages/camera-form/camera-form.component').then(
+            (m) => m.CameraFormComponent,
+          ),
+      },
+      {
+        path: 'camera-form',
+        loadComponent: () =>
+          import('@features/cameras/pages/camera-form/camera-form.component').then(
+            (m) => m.CameraFormComponent,
+          ),
+      },
+      {
+        path: 'camera-monitor',
+        loadComponent: () =>
+          import('@features/camera-monitor/pages/camera-monitor/camera-monitor.component').then(
+            (m) => m.CameraMonitorComponent,
+          ),
+      },
+      {
+        path: 'camera-history/:cameraId',
+        loadComponent: () =>
+          import('@features/camera-history/pages/camera-history/camera-history.component').then(
+            (m) => m.CameraHistoryComponent,
           ),
       },
       {

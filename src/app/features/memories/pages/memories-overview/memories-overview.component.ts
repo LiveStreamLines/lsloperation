@@ -9,8 +9,8 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { catchError, finalize } from 'rxjs/operators';
 import { of } from 'rxjs';
+import { catchError, finalize } from 'rxjs/operators';
 import { MemoryService } from '@core/services/memory.service';
 import { DeveloperService } from '@core/services/developer.service';
 import { ProjectService } from '@core/services/project.service';
@@ -28,7 +28,7 @@ interface MemoryMetricCard {
   tone: 'default' | 'positive' | 'warning';
 }
 
-interface MemoryFilterOption {
+interface FilterOption {
   value: string;
   label: string;
 }
@@ -51,8 +51,6 @@ interface UiMemory {
   endDisplayDate?: string;
   endSource?: 'end' | 'removed' | 'archived';
   endUser?: string;
-  createdDate?: string;
-  endDate?: string;
   dateOfRemoval?: string;
   dateOfReceive?: string;
   removalUser?: string;
@@ -90,11 +88,9 @@ export class MemoriesOverviewComponent implements OnInit {
   readonly selectedStatus = signal<MemoryStatus | null>(null);
   readonly showLowMemoryOnly = signal(false);
 
-  readonly updatingMemoryIds = signal<Set<string>>(new Set());
+  readonly updatingIds = signal<Set<string>>(new Set());
 
-  readonly showLowMemoryToggle = computed(() => this.selectedStatus() === 'active');
-
-  private readonly baseStatusOptions: MemoryFilterOption[] = [
+  private readonly baseStatusOptions: FilterOption[] = [
     { value: 'all', label: 'All statuses' },
     { value: 'active', label: 'Active' },
     { value: 'removed', label: 'Removed' },
@@ -116,64 +112,35 @@ export class MemoriesOverviewComponent implements OnInit {
   readonly userRole = computed(() => this.authStore.user()?.role ?? 'Viewer');
   readonly userName = computed(() => this.authStore.user()?.name ?? 'System');
 
-  readonly developerMapByTag = computed(() => {
-    const map = new Map<string, Developer>();
-    for (const developer of this.developers()) {
-      const tag = this.normalizeTag(developer.developerTag);
-      if (tag) {
-        map.set(tag, developer);
-      }
+  readonly showLowMemoryToggle = computed(() => this.selectedStatus() === 'active');
+
+  readonly statusOptions = computed<FilterOption[]>(() => {
+    const role = this.memoryRole();
+    if (role === 'removal') {
+      return this.baseStatusOptions.filter((option) => option.value === 'active');
     }
-    return map;
+    if (role === 'archiver') {
+      return this.baseStatusOptions.filter((option) => option.value === 'removed');
+    }
+    return this.baseStatusOptions;
   });
 
-  readonly projectMapByTag = computed(() => {
-    const map = new Map<string, Project>();
-    for (const project of this.projects()) {
-      const tag = this.normalizeTag(this.extractProjectTag(project));
-      if (tag) {
-        map.set(tag, project);
-      }
-    }
-    return map;
-  });
-
-  readonly cameraMapByTag = computed(() => {
-    const map = new Map<string, Camera>();
-    for (const camera of this.cameras()) {
-      const tag = this.normalizeTag(camera.camera);
-      if (tag) {
-        map.set(tag, camera);
-      }
-    }
-    return map;
-  });
-
-  readonly normalizedMemories = computed<UiMemory[]>(() =>
-    this.memories().map((memory) => this.decorateMemory(memory)),
+  readonly developerOptions = computed<FilterOption[]>(() =>
+    this.developers()
+      .map((developer) => ({
+        value: developer.developerTag ?? developer._id,
+        label: developer.developerName,
+      }))
+      .filter((option) => typeof option.value === 'string' && option.value.trim().length > 0)
+      .sort((a, b) => a.label.localeCompare(b.label)),
   );
 
-  readonly developerOptions = computed<MemoryFilterOption[]>(() => {
-    const seen = new Map<string, string>();
-    for (const memory of this.normalizedMemories()) {
-      if (!memory.developerTag) {
-        continue;
-      }
-      if (!seen.has(memory.developerTag)) {
-        seen.set(memory.developerTag, memory.developerLabel);
-      }
-    }
-    return Array.from(seen.entries())
-      .map(([value, label]) => ({ value, label }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  });
-
-  readonly projectOptions = computed<MemoryFilterOption[]>(() => {
-    const selectedDeveloperTag = this.normalizeTag(this.selectedDeveloper());
+  readonly projectOptions = computed<FilterOption[]>(() => {
+    const developerTag = this.normalizeTag(this.selectedDeveloper());
     const seen = new Map<string, string>();
 
     for (const memory of this.normalizedMemories()) {
-      if (selectedDeveloperTag && memory.developerTag !== selectedDeveloperTag) {
+      if (developerTag && memory.developerTag !== developerTag) {
         continue;
       }
       if (!memory.projectTag) {
@@ -189,16 +156,16 @@ export class MemoriesOverviewComponent implements OnInit {
       .sort((a, b) => a.label.localeCompare(b.label));
   });
 
-  readonly cameraOptions = computed<MemoryFilterOption[]>(() => {
-    const selectedDeveloperTag = this.normalizeTag(this.selectedDeveloper());
-    const selectedProjectTag = this.normalizeTag(this.selectedProject());
+  readonly cameraOptions = computed<FilterOption[]>(() => {
+    const developerTag = this.normalizeTag(this.selectedDeveloper());
+    const projectTag = this.normalizeTag(this.selectedProject());
     const seen = new Map<string, string>();
 
     for (const memory of this.normalizedMemories()) {
-      if (selectedDeveloperTag && memory.developerTag !== selectedDeveloperTag) {
+      if (developerTag && memory.developerTag !== developerTag) {
         continue;
       }
-      if (selectedProjectTag && memory.projectTag !== selectedProjectTag) {
+      if (projectTag && memory.projectTag !== projectTag) {
         continue;
       }
       if (!memory.cameraTag) {
@@ -214,16 +181,42 @@ export class MemoriesOverviewComponent implements OnInit {
       .sort((a, b) => a.label.localeCompare(b.label));
   });
 
-  readonly statusOptions = computed<MemoryFilterOption[]>(() => {
-    const role = this.memoryRole();
-    if (role === 'removal') {
-      return this.baseStatusOptions.filter((option) => option.value === 'active');
+  readonly developerMap = computed(() => {
+    const map = new Map<string, Developer>();
+    for (const developer of this.developers()) {
+      const tag = this.normalizeTag(developer.developerTag) || developer._id;
+      if (tag) {
+        map.set(tag, developer);
+      }
     }
-    if (role === 'archiver') {
-      return this.baseStatusOptions.filter((option) => option.value === 'removed');
-    }
-    return this.baseStatusOptions;
+    return map;
   });
+
+  readonly projectMap = computed(() => {
+    const map = new Map<string, Project>();
+    for (const project of this.projects()) {
+      const tag = this.normalizeTag(project.projectTag) || project._id;
+      if (tag) {
+        map.set(tag, project);
+      }
+    }
+    return map;
+  });
+
+  readonly cameraMap = computed(() => {
+    const map = new Map<string, Camera>();
+    for (const camera of this.cameras()) {
+      const tag = this.normalizeTag(camera.camera) || camera._id;
+      if (tag) {
+        map.set(tag, camera);
+      }
+    }
+    return map;
+  });
+
+  readonly normalizedMemories = computed<UiMemory[]>(() =>
+    this.memories().map((memory) => this.decorateMemory(memory)),
+  );
 
   readonly filteredMemories = computed<UiMemory[]>(() =>
     this.applyFilters(this.normalizedMemories()),
@@ -232,10 +225,10 @@ export class MemoriesOverviewComponent implements OnInit {
   readonly metricCards = computed<MemoryMetricCard[]>(() => {
     const list = this.filteredMemories();
     const total = list.length;
-    const active = list.filter((memory) => memory.status === 'active').length;
-    const removed = list.filter((memory) => memory.status === 'removed').length;
-    const archived = list.filter((memory) => memory.status === 'archived').length;
-    const lowMemory = list.filter((memory) => this.isLowMemory(memory)).length;
+    const active = list.filter((item) => item.status === 'active').length;
+    const removed = list.filter((item) => item.status === 'removed').length;
+    const archived = list.filter((item) => item.status === 'archived').length;
+    const low = list.filter((item) => this.isLowMemory(item)).length;
 
     return [
       {
@@ -264,9 +257,9 @@ export class MemoriesOverviewComponent implements OnInit {
       },
       {
         title: 'Low storage',
-        value: lowMemory.toString(),
+        value: low.toString(),
         helper: '< 10GB available',
-        tone: lowMemory > 0 ? 'warning' : 'positive',
+        tone: low > 0 ? 'warning' : 'positive',
       },
     ];
   });
@@ -274,21 +267,18 @@ export class MemoriesOverviewComponent implements OnInit {
   constructor() {
     effect(() => {
       const role = this.memoryRole();
-      const currentStatus = this.selectedStatus();
-      if (role === 'removal' && currentStatus !== 'active') {
-        if (this.showLowMemoryOnly()) {
-          this.showLowMemoryOnly.set(false);
-        }
+      const status = this.selectedStatus();
+      if (role === 'removal' && status !== 'active') {
         this.selectedStatus.set('active');
+        this.showLowMemoryOnly.set(false);
         return;
       }
-      if (role === 'archiver' && currentStatus !== 'removed') {
-        if (this.showLowMemoryOnly()) {
-          this.showLowMemoryOnly.set(false);
-        }
+      if (role === 'archiver' && status !== 'removed') {
         this.selectedStatus.set('removed');
+        this.showLowMemoryOnly.set(false);
         return;
       }
+
       if (this.selectedStatus() !== 'active' && this.showLowMemoryOnly()) {
         this.showLowMemoryOnly.set(false);
       }
@@ -321,7 +311,6 @@ export class MemoriesOverviewComponent implements OnInit {
       this.showLowMemoryOnly.set(false);
       return;
     }
-
     const status = value as MemoryStatus;
     this.selectedStatus.set(status);
     if (status !== 'active') {
@@ -337,13 +326,16 @@ export class MemoriesOverviewComponent implements OnInit {
     this.selectedDeveloper.set(null);
     this.selectedProject.set(null);
     this.selectedCamera.set(null);
-    this.selectedStatus.set(
-      this.memoryRole() === 'removal'
-        ? 'active'
-        : this.memoryRole() === 'archiver'
-          ? 'removed'
-          : null,
-    );
+
+    const role = this.memoryRole();
+    if (role === 'removal') {
+      this.selectedStatus.set('active');
+    } else if (role === 'archiver') {
+      this.selectedStatus.set('removed');
+    } else {
+      this.selectedStatus.set(null);
+    }
+
     this.showLowMemoryOnly.set(false);
   }
 
@@ -351,22 +343,18 @@ export class MemoriesOverviewComponent implements OnInit {
     if (memory.status !== 'active') {
       return false;
     }
-
     if (memory.memoryAvailableValue === null) {
       return false;
     }
-
     return memory.memoryAvailableValue < 10;
   }
 
   statusTone(status: MemoryStatus): 'default' | 'positive' | 'warning' {
     switch (status) {
-      case 'active':
-        return 'default';
-      case 'removed':
-        return 'warning';
       case 'archived':
         return 'positive';
+      case 'removed':
+        return 'warning';
       default:
         return 'default';
     }
@@ -390,8 +378,8 @@ export class MemoriesOverviewComponent implements OnInit {
     return role === 'archiver' || userRole === 'Super Admin';
   }
 
-  isUpdating(memoryId: string): boolean {
-    return this.updatingMemoryIds().has(memoryId);
+  isUpdating(id: string): boolean {
+    return this.updatingIds().has(id);
   }
 
   updateMemoryStatus(memory: UiMemory, status: MemoryStatus): void {
@@ -400,8 +388,8 @@ export class MemoriesOverviewComponent implements OnInit {
     }
 
     const payload = this.buildStatusPayload(status);
-    this.errorMessage.set(null);
     this.addUpdating(memory.id);
+    this.errorMessage.set(null);
 
     this.memoryService
       .update(memory.id, { status, ...payload })
@@ -410,7 +398,7 @@ export class MemoriesOverviewComponent implements OnInit {
         catchError((error) => {
           console.error('Failed to update memory status', error);
           this.errorMessage.set('Unable to update memory status. Please try again.');
-          return of(null);
+          return of<Memory | null>(null);
         }),
         finalize(() => this.removeUpdating(memory.id)),
       )
@@ -495,15 +483,14 @@ export class MemoriesOverviewComponent implements OnInit {
     const projectTag = this.normalizeTag(memory.project);
     const cameraTag = this.normalizeTag(memory.camera);
 
-    const developer = developerTag ? this.developerMapByTag().get(developerTag) : undefined;
-    const project = projectTag ? this.projectMapByTag().get(projectTag) : undefined;
-    const camera = cameraTag ? this.cameraMapByTag().get(cameraTag) : undefined;
+    const developer = developerTag ? this.developerMap().get(developerTag) : undefined;
+    const project = projectTag ? this.projectMap().get(projectTag) : undefined;
 
     const numberOfPictures = this.resolveNumberOfPictures(memory);
     const shutterCount = typeof memory.shuttercount === 'number' ? memory.shuttercount : null;
     const memoryAvailableValue = this.parseMemorySize(memory.memoryAvailable);
-    const startDate = memory.createdDate;
 
+    const startDate = memory.createdDate;
     let endDate: string | undefined;
     let endSource: 'end' | 'removed' | 'archived' | undefined;
     let endUser: string | undefined;
@@ -528,7 +515,7 @@ export class MemoriesOverviewComponent implements OnInit {
       projectTag,
       projectLabel: project ? this.extractProjectName(project) : memory.project ?? 'Unknown project',
       cameraTag,
-      cameraLabel: camera ? this.extractCameraLabel(camera) : memory.camera ?? 'Unknown camera',
+      cameraLabel: memory.camera ?? 'Unknown camera',
       status: this.normalizeStatus(memory.status),
       memoryUsed: memory.memoryUsed,
       memoryAvailable: memory.memoryAvailable,
@@ -539,8 +526,6 @@ export class MemoriesOverviewComponent implements OnInit {
       endDisplayDate: endDate,
       endSource,
       endUser,
-      createdDate: memory.createdDate,
-      endDate: memory.endDate,
       dateOfRemoval: memory.dateOfRemoval,
       dateOfReceive: memory.dateOfReceive,
       removalUser: memory.RemovalUser,
@@ -576,6 +561,17 @@ export class MemoriesOverviewComponent implements OnInit {
     });
   }
 
+  private normalizeStatus(status: string | undefined): MemoryStatus {
+    const normalized = (status ?? 'active').toString().trim().toLowerCase();
+    if (normalized === 'archived') {
+      return 'archived';
+    }
+    if (normalized === 'removed') {
+      return 'removed';
+    }
+    return 'active';
+  }
+
   private normalizeTag(value: string | null | undefined): string {
     if (!value || typeof value !== 'string') {
       return '';
@@ -583,55 +579,14 @@ export class MemoriesOverviewComponent implements OnInit {
     return value.trim().toLowerCase();
   }
 
-  private extractProjectTag(project: Project): string | undefined {
-    if (typeof project.projectTag === 'string' && project.projectTag.trim().length > 0) {
-      return project.projectTag;
-    }
-    if (typeof project._id === 'string' && project._id.trim().length > 0) {
-      return project._id;
-    }
-    return undefined;
-  }
-
-  private extractProjectName(project: Project): string {
-    if (typeof project.projectName === 'string' && project.projectName.trim().length > 0) {
-      return project.projectName;
-    }
-    if (typeof project.projectTag === 'string' && project.projectTag.trim().length > 0) {
-      return project.projectTag;
-    }
-    if (typeof project._id === 'string' && project._id.trim().length > 0) {
-      return project._id;
-    }
-    return 'Unknown project';
-  }
-
-  private extractCameraLabel(camera: Camera): string {
-    if (typeof camera.cameraDescription === 'string' && camera.cameraDescription.length > 0) {
-      return camera.cameraDescription;
-    }
-    return camera.camera ?? 'Unknown camera';
-  }
-
-  private normalizeStatus(status: string | undefined): MemoryStatus {
-    const normalized = (status ?? 'active').toString().trim().toLowerCase();
-    if (normalized === 'removed') {
-      return 'removed';
-    }
-    if (normalized === 'archived') {
-      return 'archived';
-    }
-    return 'active';
-  }
-
   private resolveNumberOfPictures(memory: Memory): number | null {
     const primary = memory.numberofpics ?? memory.numberOfPics;
     if (typeof primary === 'number' && Number.isFinite(primary)) {
       return primary;
     }
-    const fallback = memory['numberofpic'] ?? memory['numberOfPic'];
-    if (typeof fallback === 'number' && Number.isFinite(fallback)) {
-      return fallback;
+    const alternative = memory['numberofpic'] ?? memory['numberOfPic'];
+    if (typeof alternative === 'number' && Number.isFinite(alternative)) {
+      return alternative;
     }
     return null;
   }
@@ -640,7 +595,6 @@ export class MemoriesOverviewComponent implements OnInit {
     if (!value) {
       return null;
     }
-
     const numeric = parseFloat(value.replace(/[^\d.]/g, ''));
     if (Number.isFinite(numeric)) {
       return numeric;
@@ -648,8 +602,40 @@ export class MemoriesOverviewComponent implements OnInit {
     return null;
   }
 
+  private extractProjectName(project: Project): string {
+    if (project.projectName && typeof project.projectName === 'string') {
+      return project.projectName;
+    }
+    if (project.projectTag && typeof project.projectTag === 'string') {
+      return project.projectTag;
+    }
+    if (project._id) {
+      return project._id;
+    }
+    return 'Unknown project';
+  }
+
+  private extractCameraLabel(camera: Camera): string {
+    if (camera.cameraDescription && typeof camera.cameraDescription === 'string') {
+      return camera.cameraDescription;
+    }
+    if (camera.camera && typeof camera.camera === 'string') {
+      return camera.camera;
+    }
+    if (camera._id) {
+      return camera._id;
+    }
+    return 'Unknown camera';
+  }
+
+  private replaceMemory(updated: Memory): void {
+    this.memories.update((current) =>
+      current.map((item) => (item._id === updated._id ? { ...item, ...updated } : item)),
+    );
+  }
+
   private addUpdating(id: string): void {
-    this.updatingMemoryIds.update((current) => {
+    this.updatingIds.update((current) => {
       const next = new Set(current);
       next.add(id);
       return next;
@@ -657,27 +643,21 @@ export class MemoriesOverviewComponent implements OnInit {
   }
 
   private removeUpdating(id: string): void {
-    this.updatingMemoryIds.update((current) => {
+    this.updatingIds.update((current) => {
       const next = new Set(current);
       next.delete(id);
       return next;
     });
   }
 
-  private replaceMemory(updated: Memory): void {
-    this.memories.update((current) =>
-      current.map((memory) => (memory._id === updated._id ? { ...memory, ...updated } : memory)),
-    );
-  }
-
   private buildStatusPayload(status: MemoryStatus): Partial<Omit<Memory, 'status'>> {
     const now = new Date().toISOString();
-    const user = this.userName();
+    const actor = this.userName();
 
     if (status === 'removed') {
       return {
         dateOfRemoval: now,
-        RemovalUser: user,
+        RemovalUser: actor,
         dateOfReceive: undefined,
         RecieveUser: undefined,
       };
@@ -686,7 +666,7 @@ export class MemoriesOverviewComponent implements OnInit {
     if (status === 'archived') {
       return {
         dateOfReceive: now,
-        RecieveUser: user,
+        RecieveUser: actor,
       };
     }
 

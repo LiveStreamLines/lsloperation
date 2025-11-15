@@ -1,0 +1,1058 @@
+<section class="space-y-8">
+  <header class="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div class="max-w-2xl space-y-2">
+        <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">Live camera monitor</p>
+        <h1 class="text-3xl font-bold text-slate-900">Field fleet overview</h1>
+        <p class="text-sm text-slate-500">
+          Track camera health, review recent imagery, and dispatch maintenance tasks without leaving this screen.
+          Filters match the legacy workflow so you can pivot by developer, project, or update state.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+          (click)="refresh()"
+          [disabled]="isRefreshing() || isLoading()"
+        >
+          <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
+            <path
+              d="M3.172 7A7.001 7.001 0 0117 10a1 1 0 11-2 0 5 5 0 00-8.9-3H8a1 1 0 010 2H3a1 1 0 01-1-1V3a1 1 0 012 0v2a6.964 6.964 0 011.172 2zM17 13l.001 4a1 1 0 01-1 1H12a1 1 0 010-2h2.899A5.002 5.002 0 007 11a1 1 0 010-2 7 7 0 018.828 5H12a1 1 0 110-2h5a1 1 0 011 1z"
+            />
+          </svg>
+          {{ isRefreshing() ? 'Refreshing…' : 'Refresh data' }}
+        </button>
+      </div>
+    </div>
+  </header>
+
+  @if (toast()) {
+    <div class="fixed right-6 top-6 z-50">
+      <div
+        class="flex items-center gap-3 rounded-2xl px-4 py-3 shadow-lg"
+        [ngClass]="toast()!.tone === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
+      >
+        <span class="text-sm font-semibold">{{ toast()!.message }}</span>
+        <button
+          type="button"
+          class="rounded-full p-1 text-xs font-semibold uppercase tracking-wide text-slate-400 transition hover:text-slate-600"
+          (click)="dismissToast()"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <div class="rounded-3xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">
+      {{ errorMessage() }}
+    </div>
+  }
+
+  <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    @for (card of metrics(); track card.title) {
+      <article
+        class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+      >
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ card.title }}</p>
+        <p class="mt-3 text-2xl font-semibold text-slate-900">{{ card.value }}</p>
+        <p
+          class="mt-2 text-xs font-medium uppercase tracking-wide"
+          [ngClass]="
+            card.tone === 'positive'
+              ? 'text-emerald-600'
+              : card.tone === 'warning'
+                ? 'text-amber-600'
+                : 'text-slate-500'
+          "
+        >
+          {{ card.helper }}
+        </p>
+      </article>
+    }
+  </div>
+
+  <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div class="flex flex-col gap-4 border-b border-slate-100 pb-5">
+      @if (countryOptions().length > 0) {
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition"
+            [ngClass]="
+              !selectedCountry()
+                ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-200/40'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-600'
+            "
+            (click)="onCountrySelect(null)"
+          >
+            All countries
+          </button>
+          @for (option of countryOptions(); track option.value) {
+            <button
+              type="button"
+              class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition"
+              [ngClass]="
+                selectedCountry() === option.value
+                  ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-200/40'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-600'
+              "
+              (click)="onCountrySelect(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          }
+        </div>
+      }
+
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap gap-2">
+          @for (option of cameraStatusOptions; track option.value) {
+            <button
+              type="button"
+              class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition"
+              [ngClass]="
+                selectedCameraStatus() === option.value
+                  ? 'border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-300'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              "
+              (click)="onStatusSelect(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          }
+        </div>
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          {{ filteredCameraCount() }} camera{{ filteredCameraCount() === 1 ? '' : 's' }} in view
+        </span>
+      </div>
+    </div>
+
+    <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <label class="flex flex-col gap-2 text-sm text-slate-600">
+        <span class="font-semibold text-slate-800">Developer</span>
+        <select
+          class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          [value]="selectedDeveloperId() ?? ''"
+          (change)="onDeveloperSelect($any($event.target).value)"
+        >
+          <option value="">All developers</option>
+          @for (option of developers(); track option._id) {
+            <option [value]="option._id">{{ option.developerName }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="flex flex-col gap-2 text-sm text-slate-600">
+        <span class="font-semibold text-slate-800">Project</span>
+        <select
+          class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          [value]="selectedProjectId() ?? ''"
+          (change)="onProjectSelect($any($event.target).value)"
+        >
+          <option value="">All projects</option>
+          @for (project of projects(); track project._id) {
+            <option [value]="project._id">{{ project.projectName }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2 xl:col-span-1">
+        <span class="font-semibold text-slate-800">Search</span>
+        <div class="relative">
+          <input
+            type="text"
+            class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 pr-10 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Search by camera, project, location..."
+            [value]="searchTerm()"
+            (input)="onSearch($any($event.target).value)"
+          />
+          <svg
+            class="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-slate-400"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M12.9 14.32a8 8 0 111.414-1.414l4.387 4.387a1 1 0 01-1.414 1.414l-4.387-4.387zM14 8a6 6 0 11-12 0 6 6 0 0112 0z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </div>
+      </label>
+
+      <div class="flex flex-wrap items-center gap-2 md:col-span-2 xl:col-span-1">
+        <span class="text-sm font-semibold text-slate-700">Sort by</span>
+        <div class="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1 text-xs font-semibold uppercase tracking-wide">
+          <button
+            type="button"
+            class="rounded-full px-3 py-1 transition"
+            [ngClass]="sortMode() === 'developer' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500'"
+            (click)="onSortChange('developer')"
+          >
+            Developer / project
+          </button>
+          <button
+            type="button"
+            class="rounded-full px-3 py-1 transition"
+            [ngClass]="sortMode() === 'server' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500'"
+            (click)="onSortChange('server')"
+          >
+            Server
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+      <div>
+        <span class="font-semibold text-slate-700">Total cameras:</span>
+        <span class="ml-1 text-slate-600">{{ totalCameraCount() }}</span>
+        <span class="ml-3 font-semibold text-slate-700">Showing:</span>
+        <span class="ml-1 text-slate-600">{{ filteredCameraCount() }}</span>
+      </div>
+      @if (activeFilterCount() > 0) {
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+          (click)="clearFilters()"
+        >
+          <svg viewBox="0 0 20 20" class="h-3 w-3 fill-current">
+            <path
+              d="M13.854 6.854a.5.5 0 0 0-.708-.708L10 9.293 6.854 6.146a.5.5 0 1 0-.708.708L9.293 10l-3.147 3.146a.5.5 0 0 0 .708.708L10 10.707l3.146 3.147a.5.5 0 0 0 .708-.708L10.707 10l3.147-3.146Z"
+            />
+          </svg>
+          Clear filters ({{ activeFilterCount() }})
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (isLoading()) {
+    <div class="rounded-3xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">
+      Loading camera data…
+    </div>
+  } @else if (filteredCameraCount() === 0) {
+    <div class="rounded-3xl border border-dashed border-slate-200 bg-white p-16 text-center shadow-sm">
+      <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+        <svg viewBox="0 0 24 24" class="h-6 w-6 fill-current">
+          <path
+            d="M5.636 5.636a9 9 0 1112.728 12.728A9 9 0 015.636 5.636zm10.607 2.121A7 7 0 006.343 17.657 7 7 0 0016.243 7.757zM11 7a1 1 0 011 1v3.586l1.707 1.707a1 1 0 11-1.414 1.414l-2-2A1 1 0 0110 11V8a1 1 0 011-1z"
+          />
+        </svg>
+      </div>
+      <h3 class="mt-6 text-lg font-semibold text-slate-900">No cameras match the current filters</h3>
+      <p class="mt-2 text-sm text-slate-500">Try broadening the filters or resetting them to view more cameras.</p>
+    </div>
+  } @else {
+    @if (hierarchyEntries().length > 0) {
+      <div class="space-y-10">
+        @for (developer of hierarchyEntries(); track developer.developer.id) {
+          <section class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <header class="flex flex-wrap items-center justify-between gap-4">
+              <div class="flex items-center gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                  <svg viewBox="0 0 20 20" class="h-5 w-5 fill-current">
+                    <path
+                      d="M8 2a4 4 0 110 8 4 4 0 010-8zm2 9H6a4 4 0 00-4 4v1a1 1 0 001 1h10a1 1 0 001-1v-1a4 4 0 00-4-4z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h2 class="text-xl font-semibold text-slate-900">
+                    {{ developer.developer.name }}
+                  </h2>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    {{ developer.developer.tag ?? 'No tag' }}
+                  </p>
+                </div>
+              </div>
+            </header>
+
+            <div class="space-y-8">
+              @for (project of developer.projects; track project.id) {
+                <article class="space-y-4 rounded-3xl border border-slate-100 bg-slate-50/70 p-4 shadow-sm">
+                  <header class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <h3 class="text-lg font-semibold text-slate-900">
+                        {{ project.name }}
+                        <span class="ml-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          {{ project.tag ?? 'No tag' }}
+                        </span>
+                      </h3>
+                      <p class="mt-1 text-xs uppercase tracking-wide text-slate-400">
+                        {{ project.status ?? 'Unknown status' }}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:bg-white"
+                      (click)="openProjectInfo(project.id)"
+                    >
+                      <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                        <path
+                          d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11a1 1 0 01-2 0v-4a1 1 0 112 0v4zm-1-6a1 1 0 110-2 1 1 0 010 2z"
+                        />
+                      </svg>
+                      Project info
+                    </button>
+                  </header>
+
+                  <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    @for (camera of project.cameras; track camera.id) {
+                      <div class="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-lg">
+                        <div class="flex items-center justify-between gap-3">
+                          <div>
+                            <h4 class="text-base font-semibold text-slate-900">{{ camera.name }}</h4>
+                            <p class="text-xs text-slate-500">{{ camera.description || 'No description' }}</p>
+                          </div>
+                          <div class="flex flex-col items-end gap-1">
+                            <span
+                              class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                              [ngClass]="updateStatusClass(camera)"
+                            >
+                              {{ cameraStatusLabel(camera.status) }}
+                            </span>
+                            <span class="text-[10px] uppercase tracking-wide text-slate-400">{{ lastUpdateLabel(camera) }}</span>
+                          </div>
+                        </div>
+
+                        <div class="relative overflow-hidden rounded-2xl bg-slate-100">
+                          <img
+                            [src]="imageUrl(camera)"
+                            [alt]="camera.name"
+                            class="h-56 w-full object-cover"
+                            (load)="onImageLoad(camera.id)"
+                            loading="lazy"
+                          />
+                          @if (!isImageLoaded(camera.id)) {
+                            <div class="absolute inset-0 flex items-center justify-center bg-white/60">
+                              <div class="h-8 w-8 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-500"></div>
+                            </div>
+                          }
+                        </div>
+
+                        <dl class="grid gap-2 text-xs text-slate-500">
+                          <div class="flex items-center justify-between">
+                            <dt class="font-semibold text-slate-700">Server</dt>
+                            <dd class="max-w-[60%] truncate">{{ camera.serverFolder || 'Not specified' }}</dd>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <dt class="font-semibold text-slate-700">Country</dt>
+                            <dd class="flex items-center gap-2">
+                              <span>{{ camera.country || 'Not specified' }}</span>
+                              @if (isSuperAdmin()) {
+                                <button
+                                  type="button"
+                                  class="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-300 hover:text-slate-800"
+                                  (click)="openCountryModal(camera)"
+                                  [disabled]="isCameraCountryUpdating(camera.id)"
+                                >
+                                  Edit
+                                </button>
+                              }
+                            </dd>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <dt class="font-semibold text-slate-700">Last update</dt>
+                            <dd>{{ camera.lastPhotoTime ? (camera.lastPhotoTime | date: 'medium') : 'Not available' }}</dd>
+                          </div>
+                        </dl>
+
+                        @if (isSuperAdmin()) {
+                          <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                            <button
+                              type="button"
+                              class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                              [ngClass]="
+                                !camera.cameraStatusRaw
+                                  ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-200/40'
+                                  : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-600'
+                              "
+                              (click)="clearCameraStatus(camera)"
+                              [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                            >
+                              Active
+                            </button>
+                            <button
+                              type="button"
+                              class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                              [ngClass]="
+                                isCameraStatus(camera, 'hold')
+                                  ? 'border-amber-500 bg-amber-500 text-white shadow-lg shadow-amber-200/40'
+                                  : 'border-slate-200 bg-white text-slate-600 hover:border-amber-300 hover:text-amber-600'
+                              "
+                              (click)="toggleCameraStatus(camera, 'hold')"
+                              [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                            >
+                              Hold
+                            </button>
+                            <button
+                              type="button"
+                              class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                              [ngClass]="
+                                isCameraStatus(camera, 'network')
+                                  ? 'border-sky-500 bg-sky-500 text-white shadow-lg shadow-sky-200/40'
+                                  : 'border-slate-200 bg-white text-slate-600 hover:border-sky-300 hover:text-sky-600'
+                              "
+                              (click)="toggleCameraStatus(camera, 'network')"
+                              [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                            >
+                              Network
+                            </button>
+                            <button
+                              type="button"
+                              class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                              [ngClass]="
+                                isCameraStatus(camera, 'finished')
+                                  ? 'border-slate-500 bg-slate-500 text-white shadow-lg shadow-slate-200/40'
+                                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-700'
+                              "
+                              (click)="toggleCameraStatus(camera, 'finished')"
+                              [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                            >
+                              Finished
+                            </button>
+                            @if (isCameraStatusUpdating(camera.id)) {
+                              <span class="inline-flex h-2.5 w-2.5 animate-spin rounded-full border border-slate-300 border-t-indigo-500"></span>
+                            }
+                            @if (isCameraCountryUpdating(camera.id)) {
+                              <span class="inline-flex h-2.5 w-2.5 animate-spin rounded-full border border-slate-300 border-t-emerald-500"></span>
+                            }
+                          </div>
+                        }
+
+                        <div class="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            class="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-100"
+                            (click)="openTaskModal(camera)"
+                          >
+                            <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                              <path d="M10.5 4a.5.5 0 10-1 0v5.5H4a.5.5 0 000 1h5.5V16a.5.5 0 001 0v-5.5H16a.5.5 0 000-1h-5.5V4z" />
+                            </svg>
+                            Create task
+                          </button>
+                          @if (isSuperAdmin()) {
+                            <button
+                              type="button"
+                              class="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                              (click)="openEditCamera(camera)"
+                            >
+                              <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                                <path
+                                  d="M13.586 3a2 2 0 012.828 2.828l-9.172 9.172a1 1 0 01-.45.263l-3 1a1 1 0 01-1.263-1.263l1-3a1 1 0 01.263-.45L13.586 3z"
+                                />
+                              </svg>
+                              Edit
+                            </button>
+                          }
+                          <button
+                            type="button"
+                            class="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-100"
+                            (click)="openCameraHistory(camera)"
+                          >
+                            <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                              <path
+                                d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 4a1 1 0 10-2 0v3.586l2.707 2.707a1 1 0 101.414-1.414L11 8.586V6z"
+                              />
+                            </svg>
+                            View history
+                          </button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </article>
+              }
+            </div>
+          </section>
+        }
+      </div>
+    } @else {
+      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        @for (camera of filteredCameras(); track camera.id) {
+          <article class="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-200 hover:shadow-lg">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h3 class="text-lg font-semibold text-slate-900">{{ camera.name }}</h3>
+                <p class="text-xs text-slate-500">{{ camera.projectName }} · {{ camera.developerName }}</p>
+              </div>
+                        <div class="flex flex-col items-end gap-1">
+                          <span
+                            class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                            [ngClass]="updateStatusClass(camera)"
+                          >
+                            {{ cameraStatusLabel(camera.status) }}
+                          </span>
+                          <span class="text-[10px] uppercase tracking-wide text-slate-400">{{ lastUpdateLabel(camera) }}</span>
+                        </div>
+                      </div>
+            <div class="relative overflow-hidden rounded-2xl bg-slate-100">
+              <img
+                [src]="imageUrl(camera)"
+                [alt]="camera.name"
+                class="h-56 w-full object-cover"
+                (load)="onImageLoad(camera.id)"
+                loading="lazy"
+              />
+              @if (!isImageLoaded(camera.id)) {
+                <div class="absolute inset-0 flex items-center justify-center bg-white/60">
+                  <div class="h-8 w-8 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-500"></div>
+                </div>
+              }
+            </div>
+            <dl class="grid gap-2 text-xs text-slate-500">
+              <div class="flex items-center justify-between">
+                <dt class="font-semibold text-slate-700">Server</dt>
+                <dd class="max-w-[60%] truncate">{{ camera.serverFolder || 'Not specified' }}</dd>
+              </div>
+              <div class="flex items-center justify-between">
+                <dt class="font-semibold text-slate-700">Project status</dt>
+                <dd class="text-xs uppercase tracking-wide text-slate-500">{{ camera.projectStatus ?? 'Unknown' }}</dd>
+              </div>
+              <div class="flex items-center justify-between">
+                <dt class="font-semibold text-slate-700">Last update</dt>
+                <dd>{{ camera.lastPhotoTime ? (camera.lastPhotoTime | date: 'medium') : 'Not available' }}</dd>
+              </div>
+            </dl>
+            @if (isSuperAdmin()) {
+              <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                  [ngClass]="
+                    !camera.cameraStatusRaw
+                      ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-200/40'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-600'
+                  "
+                  (click)="clearCameraStatus(camera)"
+                  [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                >
+                  Active
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                  [ngClass]="
+                    isCameraStatus(camera, 'hold')
+                      ? 'border-amber-500 bg-amber-500 text-white shadow-lg shadow-amber-200/40'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-amber-300 hover:text-amber-600'
+                  "
+                  (click)="toggleCameraStatus(camera, 'hold')"
+                  [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                >
+                  Hold
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                  [ngClass]="
+                    isCameraStatus(camera, 'network')
+                      ? 'border-sky-500 bg-sky-500 text-white shadow-lg shadow-sky-200/40'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-sky-300 hover:text-sky-600'
+                  "
+                  (click)="toggleCameraStatus(camera, 'network')"
+                  [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                >
+                  Network
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                  [ngClass]="
+                    isCameraStatus(camera, 'finished')
+                      ? 'border-slate-500 bg-slate-500 text-white shadow-lg shadow-slate-200/40'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-700'
+                  "
+                  (click)="toggleCameraStatus(camera, 'finished')"
+                  [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                >
+                  Finished
+                </button>
+                @if (isCameraStatusUpdating(camera.id)) {
+                  <span class="inline-flex h-2.5 w-2.5 animate-spin rounded-full border border-slate-300 border-t-indigo-500"></span>
+                }
+                @if (isCameraCountryUpdating(camera.id)) {
+                  <span class="inline-flex h-2.5 w-2.5 animate-spin rounded-full border border-slate-300 border-t-emerald-500"></span>
+                }
+              </div>
+            }
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-100"
+                (click)="openTaskModal(camera)"
+              >
+                <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                  <path d="M10.5 4a.5.5 0 10-1 0v5.5H4a.5.5 0 000 1h5.5V16a.5.5 0 001 0v-5.5H16a.5.5 0 000-1h-5.5V4z" />
+                </svg>
+                Create task
+              </button>
+              @if (isSuperAdmin()) {
+                <button
+                  type="button"
+                  class="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                  (click)="openEditCamera(camera)"
+                >
+                  <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                    <path
+                      d="M13.586 3a2 2 0 012.828 2.828l-9.172 9.172a1 1 0 01-.45.263l-3 1a1 1 0 01-1.263-1.263l1-3a1 1 0 01.263-.45L13.586 3z"
+                    />
+                  </svg>
+                  Edit
+                </button>
+              }
+              <button
+                type="button"
+                class="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-100"
+                (click)="openCameraHistory(camera)"
+              >
+                <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                  <path
+                    d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 4a1 1 0 10-2 0v3.586l2.707 2.707a1 1 0 101.414-1.414L11 8.586V6z"
+                  />
+                </svg>
+                View history
+              </button>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  }
+
+  @if (taskModalCamera()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+      <div class="relative w-full max-w-2xl rounded-3xl bg-white p-8 shadow-2xl">
+        <button
+          type="button"
+          class="absolute right-4 top-4 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900"
+          (click)="closeTaskModal()"
+          [disabled]="taskForm().isSaving"
+        >
+          <span class="sr-only">Close modal</span>
+          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path
+              d="M6.28 5.22a.75.75 0 10-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.z"
+            />
+          </svg>
+        </button>
+
+        <div class="space-y-6">
+          <header>
+            <h2 class="text-xl font-semibold text-slate-900">Create maintenance task</h2>
+            <p class="mt-1 text-sm text-slate-500">
+              Dispatch a maintenance request linked to {{ taskModalCamera()!.projectName }} ·
+              {{ taskModalCamera()!.developerName }}.
+            </p>
+          </header>
+
+          @if (taskForm().error) {
+            <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {{ taskForm().error }}
+            </div>
+          }
+
+          <div class="grid gap-4 md:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 md:col-span-2">
+              <p>
+                <span class="font-semibold text-slate-800">Camera:</span>
+                {{ taskModalCamera()!.name }}
+              </p>
+              <p>
+                <span class="font-semibold text-slate-800">Project:</span>
+                {{ taskModalCamera()!.projectName }} ({{ taskModalCamera()!.projectTag ?? 'No tag' }})
+              </p>
+              <p>
+                <span class="font-semibold text-slate-800">Developer:</span>
+                {{ taskModalCamera()!.developerName }} ({{ taskModalCamera()!.developerTag ?? 'No tag' }})
+              </p>
+            </div>
+
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+              <span class="font-semibold text-slate-800">Task type</span>
+              <select
+                class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                [value]="taskForm().taskType"
+                (change)="updateTaskFormField('taskType', $any($event.target).value)"
+              >
+                <option value="">Select task type</option>
+                @for (type of taskTypes; track type) {
+                  <option [value]="type">{{ type }}</option>
+                }
+              </select>
+            </label>
+
+            <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2">
+              <span class="font-semibold text-slate-800">Task description</span>
+              <textarea
+                rows="4"
+                class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                [value]="taskForm().taskDescription"
+                (input)="updateTaskFormField('taskDescription', $any($event.target).value)"
+                placeholder="Describe the issue or required maintenance work."
+              ></textarea>
+            </label>
+
+            <div class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2">
+              <span class="font-semibold text-slate-800">Assign engineers</span>
+              <div class="relative multi-select-dropdown">
+                <button
+                  type="button"
+                  class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-left text-sm shadow-sm transition hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  (click)="toggleTaskAssignedUsersDropdown()"
+                >
+                  <span class="text-slate-600">
+                    @if (taskForm().assignedUsers.length === 0) {
+                      Select engineers...
+                    } @else {
+                      {{ taskForm().assignedUsers.length }} selected
+                    }
+                  </span>
+                  <svg
+                    class="h-5 w-5 text-slate-400 transition-transform"
+                    [class.rotate-180]="isTaskAssignedUsersDropdownOpen()"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                @if (isTaskAssignedUsersDropdownOpen()) {
+                  <div
+                    class="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-2xl border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
+                  >
+                    <div class="p-2">
+                      @for (user of users(); track user._id) {
+                        <label
+                          class="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition hover:bg-slate-50"
+                          (click)="toggleTaskAssignedUserSelection(user._id)"
+                        >
+                          <input
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                            [checked]="isTaskAssignedUserSelected(user._id)"
+                            (change)="$event.stopPropagation()"
+                          />
+                          <span class="text-slate-700">{{ user.name }} ({{ user.role }})</span>
+                        </label>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+              @if (taskForm().assignedUsers.length > 0) {
+                <div class="flex flex-wrap gap-2">
+                  @for (userId of taskForm().assignedUsers; track userId) {
+                    <span
+                      class="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700"
+                    >
+                      {{ getTaskAssignedUserLabel(userId) }}
+                      <button
+                        type="button"
+                        class="rounded-full hover:bg-indigo-200"
+                        (click)="removeTaskAssignedUser(userId)"
+                      >
+                        <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fill-rule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    </span>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+              (click)="closeTaskModal()"
+              [disabled]="taskForm().isSaving"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-300 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+              (click)="saveTask()"
+              [disabled]="taskForm().isSaving"
+            >
+              <span>{{ taskForm().isSaving ? 'Saving…' : 'Create task' }}</span>
+              @if (taskForm().isSaving) {
+                <span class="h-2.5 w-2.5 animate-spin rounded-full border border-white border-t-transparent"></span>
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (projectInfoState()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+      <div class="relative w-full max-w-4xl rounded-3xl bg-white p-8 shadow-2xl">
+        <button
+          type="button"
+          class="absolute right-4 top-4 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900"
+          (click)="closeProjectInfo()"
+          [disabled]="projectInfoState()!.isUploading"
+        >
+          <span class="sr-only">Close modal</span>
+          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path
+              d="M6.28 5.22a.75.75 0 10-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z"
+            />
+          </svg>
+        </button>
+
+        <div class="space-y-6">
+          <header class="flex items-start justify-between gap-3">
+            <div>
+              <h2 class="text-xl font-semibold text-slate-900">Project information</h2>
+              <p class="mt-1 text-sm text-slate-500">
+                {{ projectInfoState()!.project.projectName }} · {{ projectInfoState()!.project.projectTag }}
+              </p>
+            </div>
+          </header>
+
+          @if (projectInfoState()!.error) {
+            <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {{ projectInfoState()!.error }}
+            </div>
+          }
+
+          <div class="grid gap-4 md:grid-cols-2">
+            <dl class="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              <div class="flex items-center justify-between">
+                <dt class="font-semibold text-slate-800">Project name</dt>
+                <dd>{{ projectInfoState()!.project.projectName }}</dd>
+              </div>
+              <div class="flex items-center justify-between">
+                <dt class="font-semibold text-slate-800">Project tag</dt>
+                <dd>{{ projectInfoState()!.project.projectTag ?? 'No tag' }}</dd>
+              </div>
+              <div class="grid grid-cols-1 gap-4 text-sm text-slate-600 md:grid-cols-2">
+                <div>
+                  <p class="font-semibold text-slate-800">Status</p>
+                  <p class="mt-1 text-xs uppercase tracking-wide text-slate-500">
+                    {{ projectInfoState()!.project.status ?? 'Unknown' }}
+                  </p>
+                </div>
+                <div>
+                  <p class="font-semibold text-slate-800">Developer</p>
+                  <p class="mt-1 text-sm text-slate-600">
+                    {{ projectInfoState()!.developerName }}
+                  </p>
+                </div>
+                <div>
+                  <p class="font-semibold text-slate-800">Developer tag</p>
+                  <p class="mt-1 text-sm text-slate-600">
+                    {{ projectInfoState()!.developerTag }}
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center justify-between">
+                <dt class="font-semibold text-slate-800">Created</dt>
+                <dd>{{ projectInfoState()!.project.createdDate ? (projectInfoState()!.project.createdDate | date: 'medium') : 'Unknown' }}</dd>
+              </div>
+            </dl>
+
+            <div class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              <span class="font-semibold text-slate-800">Attachments</span>
+              <label
+                class="inline-flex w-fit cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600"
+              >
+                <input
+                  type="file"
+                  class="hidden"
+                  (change)="uploadProjectAttachment($event)"
+                  [disabled]="projectInfoState()!.isUploading"
+                />
+                <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                  <path
+                    d="M3 4a2 2 0 012-2h5a2 2 0 011.414.586l5 5A2 2 0 0117 8.414V16a2 2 0 01-2 2H5a2 2 0 01-2-2V4zm11 0H5v12h10V9h-3a1 1 0 01-1-1V4z"
+                  />
+                </svg>
+                {{ projectInfoState()!.isUploading ? 'Uploading…' : 'Upload file' }}
+              </label>
+
+              @if (projectInfoState()!.isLoading) {
+                <div class="flex items-center gap-2 text-xs text-slate-400">
+                  <div class="h-2.5 w-2.5 animate-spin rounded-full border border-slate-300 border-t-indigo-500"></div>
+                  Loading attachments…
+                </div>
+              } @else if (projectInfoState()!.attachments.length === 0) {
+                <p class="text-xs text-slate-400">No attachments uploaded yet.</p>
+              } @else {
+                <ul class="space-y-2 text-xs">
+                  @for (attachment of projectInfoState()!.attachments; track attachment._id ?? attachment.url) {
+                    <li class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-600">
+                      <div class="flex items-center gap-2">
+                        <svg viewBox="0 0 20 20" class="h-4 w-4 text-slate-400">
+                          <path
+                            d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h6v-2H4V4h8v3a1 1 0 001 1h3v2h2V7.414a2 2 0 00-.586-1.414l-3.414-3.414A2 2 0 0012.586 2H4z"
+                          />
+                        </svg>
+                        <div class="max-w-[200px] truncate">
+                          <p class="font-semibold text-slate-700">{{ attachment.originalName ?? attachment.name }}</p>
+                          <p class="text-[10px] text-slate-400">{{ attachment.uploadedAt ? (attachment.uploadedAt | date: 'medium') : '' }}</p>
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <button
+                          type="button"
+                          class="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-indigo-200 hover:text-indigo-600"
+                          (click)="downloadAttachment(attachment)"
+                        >
+                          <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                            <path
+                              d="M10 3a1 1 0 011 1v6.586l1.293-1.293a1 1 0 111.414 1.414l-3.002 3.002a1 1 0 01-1.414 0L6.29 10.707a1 1 0 011.414-1.414L9 10.586V4a1 1 0 011-1z"
+                            />
+                            <path
+                              d="M5 15a1 1 0 100 2h10a1 1 0 100-2H5z"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          class="rounded-full border border-rose-200 p-2 text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          (click)="deleteProjectAttachment(attachment._id!)"
+                          [disabled]="isAttachmentDeleting(attachment._id!)"
+                        >
+                          @if (isAttachmentDeleting(attachment._id!)) {
+                            <span class="h-3 w-3 animate-spin rounded-full border border-rose-200 border-t-transparent"></span>
+                          } @else {
+                            <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                              <path
+                                d="M6 2a1 1 0 00-1 1v1H3.5a.5.5 0 000 1H4v10a2 2 0 002 2h8a2 2 0 002-2V5h.5a.5.5 0 000-1H15V3a1 1 0 00-1-1H6zm2 5a.5.5 0 011 0v6a.5.5 0 01-1 0V7zm4 .5a.5.5 0 10-1 0v5a.5.5 0 001 0v-5z"
+                              />
+                            </svg>
+                          }
+                        </button>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end">
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+              (click)="closeProjectInfo()"
+              [disabled]="projectInfoState()!.isUploading"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (editCountryModal()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+      <div class="relative w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl">
+        <button
+          type="button"
+          class="absolute right-4 top-4 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900"
+          (click)="closeCountryModal()"
+          [disabled]="editCountryModal()?.isSaving"
+        >
+          <span class="sr-only">Close modal</span>
+          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path
+              d="M6.28 5.22a.75.75 0 10-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z"
+            />
+          </svg>
+        </button>
+
+        <div class="space-y-6">
+          <header>
+            <h2 class="text-xl font-semibold text-slate-900">Edit camera country</h2>
+            <p class="mt-1 text-sm text-slate-500">
+              Update the country information for {{ editCountryModal()!.camera.name }}.
+            </p>
+          </header>
+
+          <div class="space-y-4">
+            <div class="flex flex-col gap-2 text-sm text-slate-600">
+              <span class="font-semibold text-slate-800">Country</span>
+              <div class="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                <button
+                  type="button"
+                  class="inline-flex items-center rounded-full border px-3 py-1 transition"
+                  [ngClass]="
+                    editCountryModal()!.value === ''
+                      ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-200/40'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-600'
+                  "
+                  (click)="setCountryModalValue('')"
+                  [disabled]="editCountryModal()!.isSaving"
+                >
+                  No country
+                </button>
+                @for (country of allowedCountries; track country) {
+                  <button
+                    type="button"
+                    class="inline-flex items-center rounded-full border px-3 py-1 transition"
+                    [ngClass]="
+                      editCountryModal()!.value === country
+                        ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-200/40'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-600'
+                    "
+                    (click)="setCountryModalValue(country)"
+                    [disabled]="editCountryModal()!.isSaving"
+                  >
+                    {{ country }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            @if (editCountryModal()!.error) {
+              <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {{ editCountryModal()!.error }}
+              </div>
+            }
+          </div>
+
+          <div class="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+              (click)="closeCountryModal()"
+              [disabled]="editCountryModal()!.isSaving"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="inline-flex items-center rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-300 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+              (click)="saveCountryModal()"
+              [disabled]="editCountryModal()!.isSaving"
+            >
+              <span>Save changes</span>
+              @if (editCountryModal()!.isSaving) {
+                <span class="ml-2 h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></span>
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</section>
+
