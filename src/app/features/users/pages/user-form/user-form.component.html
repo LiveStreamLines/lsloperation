@@ -100,13 +100,7 @@
                 [disabled]="!isSuperAdmin()"
               />
             </label>
-          </div>
-        </fieldset>
 
-        <!-- Permissions Section -->
-        <fieldset class="space-y-4 rounded-2xl border border-slate-200 p-6">
-          <legend class="px-2 text-sm font-semibold text-slate-700">Permissions</legend>
-          <div class="grid gap-4 md:grid-cols-2">
             <label class="flex flex-col gap-2 text-sm text-slate-600">
               <span class="font-semibold text-slate-800">Role <span class="text-rose-500">*</span></span>
               <select
@@ -123,16 +117,21 @@
               </select>
             </label>
           </div>
+        </fieldset>
 
+        <!-- Camera access Section -->
+        <fieldset class="space-y-4 rounded-2xl border border-slate-200 p-6">
+          <legend class="px-2 text-sm font-semibold text-slate-700">Camera access</legend>
           @if (!hidePermissions()) {
             <div class="space-y-4">
-              <!-- Accessible Developers -->
-              <label class="flex flex-col gap-2 text-sm text-slate-600">
+              <div class="grid gap-4 md:grid-cols-2">
+                <!-- Accessible Developers -->
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-semibold text-slate-800">Accessible Developers</span>
-                <div class="relative multi-select-dropdown">
+                <div class="relative multi-select-dropdown md:w-1/2">
                   <button
                     type="button"
-                    class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-left text-sm shadow-sm transition hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm transition hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     (click)="toggleDeveloperDropdown()"
                   >
                     <span class="text-slate-600">
@@ -215,16 +214,16 @@
                     }
                   </div>
                 }
-              </label>
+                </label>
 
-              <!-- Accessible Projects -->
-              @if (filteredProjects().length > 0 || isAllProjSelected()) {
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <!-- Accessible Projects -->
+                @if (filteredProjects().length > 0 || isAllProjSelected()) {
+                  <label class="flex flex-col gap-2 text-sm text-slate-600">
                   <span class="font-semibold text-slate-800">Accessible Projects</span>
-                  <div class="relative multi-select-dropdown">
+                  <div class="relative multi-select-dropdown md:w-1/2">
                     <button
                       type="button"
-                      class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-left text-sm shadow-sm transition hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm transition hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       (click)="toggleProjectDropdown()"
                     >
                       <span class="text-slate-600">
@@ -307,16 +306,16 @@
                       }
                     </div>
                   }
-                </label>
-              }
+                  </label>
+                }
 
-              <!-- Accessible Services -->
-              <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <!-- Accessible Services -->
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-semibold text-slate-800">Accessible Services</span>
-                <div class="relative multi-select-dropdown">
+                <div class="relative multi-select-dropdown md:w-1/2">
                   <button
                     type="button"
-                    class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-left text-sm shadow-sm transition hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm transition hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     (click)="toggleServiceDropdown()"
                   >
                     <span class="text-slate-600">
@@ -397,16 +396,16 @@
                     }
                   </div>
                 }
-              </label>
+                </label>
 
-              <!-- Accessible Cameras -->
-              @if (filteredCameras().length > 0 || isAllCameraSelected()) {
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <!-- Accessible Cameras -->
+                @if (filteredCameras().length > 0 || isAllCameraSelected()) {
+                  <label class="flex flex-col gap-2 text-sm text-slate-600">
                   <span class="font-semibold text-slate-800">Accessible Cameras</span>
-                  <div class="relative multi-select-dropdown">
+                  <div class="relative multi-select-dropdown md:w-1/2">
                     <button
                       type="button"
-                      class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-left text-sm shadow-sm transition hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm transition hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       (click)="toggleCameraDropdown()"
                     >
                       <span class="text-slate-600">
@@ -489,8 +488,9 @@
                       }
                     </div>
                   }
-                </label>
-              }
+                  </label>
+                }
+              </div>
 
               <!-- Permissions Checkboxes -->
               <div class="grid gap-4 md:grid-cols-2">
@@ -517,41 +517,164 @@
               </div>
             </div>
           }
-
-          <!-- Memory Role (shown only for Admin) -->
-          @if (showAdminRoles()) {
-            <label class="flex flex-col gap-2 text-sm text-slate-600">
-              <span class="font-semibold text-slate-800">Memory Role</span>
-              <select
-                class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                [ngModel]="userForm().memoryRole"
-                (ngModelChange)="updateFormField('memoryRole', $event)"
-                [ngModelOptions]="{standalone: true}"
-              >
-                @for (role of memoryRoles; track role.value) {
-                  <option [value]="role.value">{{ role.viewValue }}</option>
-                }
-              </select>
-            </label>
-          }
-
-          <!-- Inventory Role (shown only for Admin) -->
-          @if (showAdminRoles()) {
-            <label class="flex flex-col gap-2 text-sm text-slate-600">
-              <span class="font-semibold text-slate-800">Inventory Role</span>
-              <select
-                class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                [ngModel]="userForm().inventoryRole"
-                (ngModelChange)="updateFormField('inventoryRole', $event)"
-                [ngModelOptions]="{standalone: true}"
-              >
-                @for (role of inventoryRoles; track role.value) {
-                  <option [value]="role.value">{{ role.viewValue }}</option>
-                }
-              </select>
-            </label>
-          }
         </fieldset>
+
+        <!-- Operation permissions (Admin only) -->
+        @if (showAdminRoles()) {
+          <fieldset class="space-y-5 rounded-2xl border border-slate-200 p-6">
+            <legend class="px-2 text-sm font-semibold text-slate-700">Operation permissions</legend>
+
+            <!-- Camera monitor permissions -->
+            <div class="space-y-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Camera monitor</h3>
+              <div class="grid gap-3 md:grid-cols-2">
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                    [ngModel]="userForm().canWatchCameraMonitor"
+                    (ngModelChange)="updateFormField('canWatchCameraMonitor', $event)"
+                    [ngModelOptions]="{standalone: true}"
+                  />
+                  <span>Watch camera monitor</span>
+                </label>
+
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                    [ngModel]="userForm().canCreateMonitorTask"
+                    (ngModelChange)="updateFormField('canCreateMonitorTask', $event)"
+                    [ngModelOptions]="{standalone: true}"
+                  />
+                  <span>Create task</span>
+                </label>
+
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                    [ngModel]="userForm().canHoldMaintenance"
+                    (ngModelChange)="updateFormField('canHoldMaintenance', $event)"
+                    [ngModelOptions]="{standalone: true}"
+                  />
+                  <span>Hold maintenance</span>
+                </label>
+
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                    [ngModel]="userForm().canDeletePhoto"
+                    (ngModelChange)="updateFormField('canDeletePhoto', $event)"
+                    [ngModelOptions]="{standalone: true}"
+                  />
+                  <span>Delete photo</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Inventory permissions -->
+            <div class="space-y-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Inventory</h3>
+              <div class="grid gap-3 md:grid-cols-2">
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                    [ngModel]="userForm().canAddDeviceType"
+                    (ngModelChange)="updateFormField('canAddDeviceType', $event)"
+                    [ngModelOptions]="{standalone: true}"
+                  />
+                  <span>Add device type</span>
+                </label>
+
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                    [ngModel]="userForm().canAddDeviceStock"
+                    (ngModelChange)="updateFormField('canAddDeviceStock', $event)"
+                    [ngModelOptions]="{standalone: true}"
+                  />
+                  <span>Add device stock</span>
+                </label>
+
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                    [ngModel]="userForm().canAssignUnassignUser"
+                    (ngModelChange)="updateFormField('canAssignUnassignUser', $event)"
+                    [ngModelOptions]="{standalone: true}"
+                  />
+                  <span>Assign / unassign user</span>
+                </label>
+
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                    [ngModel]="userForm().canAssignUnassignProject"
+                    (ngModelChange)="updateFormField('canAssignUnassignProject', $event)"
+                    [ngModelOptions]="{standalone: true}"
+                  />
+                  <span>Assign / unassign project</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Memory permissions -->
+            <div class="space-y-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Memory</h3>
+              <div class="grid gap-3 md:grid-cols-2">
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                    [ngModel]="userForm().canArchiveMemory"
+                    (ngModelChange)="updateFormField('canArchiveMemory', $event)"
+                    [ngModelOptions]="{standalone: true}"
+                  />
+                  <span>Archive memory</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Existing operation roles (optional finer grain) -->
+            <div class="grid gap-4 md:grid-cols-2">
+              <!-- Memory Role -->
+              <label class="flex flex-col gap-2 text-sm text-slate-600 md:w-1/2">
+                <span class="font-semibold text-slate-800">Memory Role</span>
+                <select
+                  class="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  [ngModel]="userForm().memoryRole"
+                  (ngModelChange)="updateFormField('memoryRole', $event)"
+                  [ngModelOptions]="{standalone: true}"
+                >
+                  @for (role of memoryRoles; track role.value) {
+                    <option [value]="role.value">{{ role.viewValue }}</option>
+                  }
+                </select>
+              </label>
+
+              <!-- Inventory Role -->
+              <label class="flex flex-col gap-2 text-sm text-slate-600 md:w-1/2">
+                <span class="font-semibold text-slate-800">Inventory Role</span>
+                <select
+                  class="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  [ngModel]="userForm().inventoryRole"
+                  (ngModelChange)="updateFormField('inventoryRole', $event)"
+                  [ngModelOptions]="{standalone: true}"
+                >
+                  @for (role of inventoryRoles; track role.value) {
+                    <option [value]="role.value">{{ role.viewValue }}</option>
+                  }
+                </select>
+              </label>
+            </div>
+          </fieldset>
+        }
 
         @if (userForm().error) {
           <div class="rounded-2xl bg-rose-50 p-4 text-sm text-rose-700 ring-1 ring-rose-200">

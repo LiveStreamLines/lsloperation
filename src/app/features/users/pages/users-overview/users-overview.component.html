@@ -69,16 +69,33 @@
       }
     </div>
 
-    <label class="flex flex-col gap-2 text-sm text-slate-600">
-      <span class="sr-only">Search Users</span>
-      <input
-        type="text"
-        class="w-64 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        placeholder="Search by name, email, or role..."
-        [value]="searchTerm()"
-        (input)="onSearchChange($any($event.target).value)"
-      />
-    </label>
+    <div class="flex flex-wrap items-center gap-4">
+      <label class="flex flex-col gap-2 text-sm text-slate-600">
+        <span class="font-semibold text-slate-800">Filter by Role</span>
+        <select
+          class="w-48 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          [value]="selectedRole()"
+          (change)="onRoleChange($any($event.target).value)"
+        >
+          @for (role of availableRoles(); track role) {
+            <option [value]="role">
+              {{ role === 'ALL' ? 'All Roles' : role }}
+            </option>
+          }
+        </select>
+      </label>
+
+      <label class="flex flex-col gap-2 text-sm text-slate-600">
+        <span class="sr-only">Search Users</span>
+        <input
+          type="text"
+          class="w-64 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Search by name, email, or role..."
+          [value]="searchTerm()"
+          (input)="onSearchChange($any($event.target).value)"
+        />
+      </label>
+    </div>
   </div>
 
   @if (errorMessage()) {

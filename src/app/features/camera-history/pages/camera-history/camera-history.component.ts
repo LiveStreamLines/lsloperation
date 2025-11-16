@@ -5,6 +5,7 @@ import {
   OnInit,
   computed,
   inject,
+  input,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -14,6 +15,7 @@ import { EMPTY, forkJoin, of } from 'rxjs';
 import { catchError, filter, map, switchMap, tap } from 'rxjs/operators';
 import {
   Camera,
+  CameraHealthResponse,
   CameraHistoryPreviewResponse,
   CameraHistoryResponse,
   CameraHistoryVideoResponse,
@@ -30,6 +32,8 @@ import { InventoryItem } from '@core/models/inventory.model';
 import { InventoryService } from '@core/services/inventory.service';
 import { User } from '@core/models/user.model';
 import { UserService } from '@core/services/user.service';
+import { Memory } from '@core/models/memory.model';
+import { MemoryService } from '@core/services/memory.service';
 
 interface CameraHistoryTags {
   developerTag: string;
@@ -44,6 +48,9 @@ interface CameraHistoryTags {
   templateUrl: './camera-history.component.html',
 })
 export class CameraHistoryComponent implements OnInit {
+  // Optional input for cameraId when used as a modal (instead of route param)
+  readonly cameraIdInput = input<string | null>(null);
+
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly cameraService = inject(CameraService);
@@ -52,11 +59,11 @@ export class CameraHistoryComponent implements OnInit {
   private readonly maintenanceService = inject(MaintenanceService);
   private readonly inventoryService = inject(InventoryService);
   private readonly userService = inject(UserService);
+  private readonly memoryService = inject(MemoryService);
   private readonly mediaBase = environment.apiUrl.replace(/\/api\/?$/, '/');
 
   readonly isLoading = signal(true);
   readonly isFetchingHistory = signal(false);
-  readonly isGeneratingVideo = signal(false);
   readonly errorMessage = signal<string | null>(null);
 
   readonly camera = signal<Camera | null>(null);
@@ -67,13 +74,14 @@ export class CameraHistoryComponent implements OnInit {
   readonly maintenanceTasks = signal<Maintenance[]>([]);
   readonly cameraInventory = signal<InventoryItem[]>([]);
   readonly users = signal<User[]>([]);
+  readonly health = signal<CameraHealthResponse | null>(null);
+  readonly cameraMemories = signal<Memory[]>([]);
 
-  readonly dateStart = signal<string>('');
-  readonly dateEnd = signal<string>('');
-  readonly appliedDate1 = signal<string>('');
-  readonly appliedDate2 = signal<string>('');
+  readonly selectedDate = signal<string>('');
+  readonly appliedDate = signal<string>('');
 
   readonly toast = signal<{ message: string; tone: 'success' | 'error' } | null>(null);
+  readonly selectedImageUrl = signal<string | null>(null);
 
   readonly hasHistory = computed(() => {
     const data = this.history();
@@ -123,20 +131,85 @@ export class CameraHistoryComponent implements OnInit {
     return this.buildHistoryImageUrl(data.lastPhoto);
   });
 
+  readonly dailyPhotos = computed(() => {
+    const data = this.history();
+    if (!data) {
+      return [];
+    }
+    const combined = [...(data.date1Photos ?? []), ...(data.date2Photos ?? [])];
+    return Array.from(new Set(combined));
+  });
+
   ngOnInit(): void {
     this.userService
       .getAll()
       .pipe(takeUntilDestroyed(this.destroyRef), catchError(() => of<User[]>([])))
       .subscribe((users) => this.users.set(users));
 
-    this.route.paramMap
-      .pipe(
-        map((params) => params.get('cameraId')),
-        filter((cameraId): cameraId is string => cameraId !== null && cameraId.length > 0),
-        switchMap((cameraId) => this.loadCamera(cameraId)),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe();
+    // Check if cameraId is provided as input (modal mode) or from route
+    const cameraIdInput = this.cameraIdInput();
+    if (cameraIdInput) {
+      // Modal mode: load camera directly from input
+      this.loadCamera(cameraIdInput)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe();
+    } else {
+      // Route mode: get cameraId from route params
+      this.route.paramMap
+        .pipe(
+          map((params) => params.get('cameraId')),
+          filter((cameraId): cameraId is string => cameraId !== null && cameraId.length > 0),
+          switchMap((cameraId) => this.loadCamera(cameraId)),
+          takeUntilDestroyed(this.destroyRef),
+        )
+        .subscribe();
+    }
+  }
+
+  onDeletePhoto(imageTimestamp: string): void {
+    if (!imageTimestamp) {
+      return;
+    }
+
+    const confirmed = window.confirm('Are you sure you want to delete this image? This action cannot be undone.');
+    if (!confirmed) {
+      return;
+    }
+
+    const tags = this.getCameraTags();
+    if (!tags) {
+      this.showToast('Camera location information is missing.', 'error');
+      return;
+    }
+
+    this.cameraService
+      .deleteHistoryImage(tags.developerTag, tags.projectTag, tags.cameraName, imageTimestamp)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (response) => {
+          if (response?.error) {
+            this.showToast(response.error, 'error');
+            return;
+          }
+
+          const currentHistory = this.history();
+          if (currentHistory) {
+            const updatedDate1Photos = currentHistory.date1Photos?.filter((p) => p !== imageTimestamp);
+            const updatedDate2Photos = currentHistory.date2Photos?.filter((p) => p !== imageTimestamp);
+
+            this.history.set({
+              ...currentHistory,
+              date1Photos: updatedDate1Photos,
+              date2Photos: updatedDate2Photos,
+            });
+          }
+
+          this.showToast('Image deleted successfully.', 'success');
+        },
+        error: () => {
+          this.showToast('Failed to delete image.', 'error');
+        },
+      });
   }
 
   buildHistoryImageUrl(filename: string | undefined | null): string | null {
@@ -163,21 +236,22 @@ export class CameraHistoryComponent implements OnInit {
     return this.appendFilename(baseUrl, filename);
   }
 
-  loadHistoryForDates(): void {
+  loadHistoryForDate(date: string): void {
+    if (!date) {
+      return;
+    }
+
     const tags = this.getCameraTags();
     if (!tags) {
       this.showToast('Camera location information is missing.', 'error');
       return;
     }
 
-    const date1 = this.toBackendDate(this.dateStart());
-    const date2 = this.toBackendDate(this.dateEnd());
+    const dateFormatted = this.toBackendDate(date);
     const payload: { date1?: string; date2?: string } = {};
-    if (date1) {
-      payload.date1 = date1;
-    }
-    if (date2) {
-      payload.date2 = date2;
+    if (dateFormatted) {
+      payload.date1 = dateFormatted;
+      payload.date2 = dateFormatted; // Use same date for both to get all images for that date
     }
 
     this.isFetchingHistory.set(true);
@@ -193,17 +267,9 @@ export class CameraHistoryComponent implements OnInit {
           }
 
           this.history.set(response);
-          const firstDate = this.extractDateFromFilename(response.firstPhoto) || this.dateStart();
-          const lastDate = this.extractDateFromFilename(response.lastPhoto) || this.dateEnd();
-
-          this.appliedDate1.set(date1 ? this.fromBackendDate(date1) : firstDate);
-          this.appliedDate2.set(date2 ? this.fromBackendDate(date2) : lastDate);
-
-          // Refresh preview in case new dates are chosen
-          this.refreshPreview(tags);
+          this.appliedDate.set(date);
 
           this.isFetchingHistory.set(false);
-          this.showToast('Camera history updated.', 'success');
         },
         error: () => {
           this.showToast('Unable to load camera history.', 'error');
@@ -212,39 +278,9 @@ export class CameraHistoryComponent implements OnInit {
       });
   }
 
-  generateWeeklyVideo(): void {
-    const tags = this.getCameraTags();
-    if (!tags) {
-      this.showToast('Camera location information is missing.', 'error');
-      return;
-    }
-
-    this.isGeneratingVideo.set(true);
-    this.cameraService
-      .generateHistoryVideo(tags.developerTag, tags.projectTag, tags.cameraName)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (response) => {
-          if (response.error || !response.videoPath) {
-            this.showToast(response.error ?? 'Unable to generate weekly video.', 'error');
-            this.isGeneratingVideo.set(false);
-            return;
-          }
-
-          const videoUrl = this.normalizeMediaPath(response.videoPath);
-          if (videoUrl) {
-            window.open(videoUrl, '_blank', 'noopener');
-          } else {
-            this.showToast('Unable to resolve video URL.', 'error');
-          }
-          this.isGeneratingVideo.set(false);
-          this.showToast('Weekly video generated.', 'success');
-        },
-        error: () => {
-          this.showToast('Unable to generate weekly video.', 'error');
-          this.isGeneratingVideo.set(false);
-        },
-      });
+  onDateChange(date: string): void {
+    this.selectedDate.set(date);
+    this.loadHistoryForDate(date);
   }
 
   dismissToast(): void {
@@ -273,8 +309,9 @@ export class CameraHistoryComponent implements OnInit {
           inventory: this.inventoryService
             .getByCamera(cameraIdRef, camera.camera)
             .pipe(catchError(() => of<InventoryItem[]>([]))),
+          memories: this.memoryService.getAll().pipe(catchError(() => of<Memory[]>([]))),
         }).pipe(
-          switchMap(({ developer, project, inventory }) => {
+          switchMap(({ developer, project, inventory, memories }) => {
             this.developer.set(developer ?? null);
             this.project.set(project ?? null);
             this.cameraInventory.set(inventory ?? []);
@@ -284,6 +321,23 @@ export class CameraHistoryComponent implements OnInit {
               throw new Error('Unable to resolve camera location.');
             }
 
+            // Filter memories belonging to this camera (by tags)
+            const devTagNorm = this.normalizeTag(tags.developerTag);
+            const projTagNorm = this.normalizeTag(tags.projectTag);
+            const camTagNorm = this.normalizeTag(tags.cameraName);
+            const cameraMemories = memories.filter((memory) => {
+              const memDev = this.normalizeTag(memory.developer);
+              const memProj = this.normalizeTag(memory.project);
+              const memCam = this.normalizeTag(memory.camera);
+              return memDev === devTagNorm && memProj === projTagNorm && memCam === camTagNorm;
+            });
+            this.cameraMemories.set(cameraMemories);
+
+            // Always fetch health data
+            const healthRequest = this.cameraService
+              .getHealth(tags.developerTag, tags.projectTag, tags.cameraName)
+              .pipe(catchError(() => of<CameraHealthResponse | null>(null)));
+
             return forkJoin({
               history: this.cameraService.getHistoryPictures(tags.developerTag, tags.projectTag, tags.cameraName),
               preview: this.cameraService
@@ -292,8 +346,9 @@ export class CameraHistoryComponent implements OnInit {
               maintenance: this.maintenanceService
                 .getByCamera(camera._id)
                 .pipe(catchError(() => of<Maintenance[]>([]))),
+              health: healthRequest,
             }).pipe(
-              tap(({ history, preview, maintenance }) => {
+              tap(({ history, preview, maintenance, health }) => {
                 if (history.error) {
                   throw new Error(history.error);
                 }
@@ -301,13 +356,17 @@ export class CameraHistoryComponent implements OnInit {
                 this.history.set(history);
                 this.preview.set(preview);
                 this.maintenanceTasks.set(maintenance ?? []);
+                this.health.set(health);
 
                 const firstDate = this.extractDateFromFilename(history.firstPhoto);
                 const lastDate = this.extractDateFromFilename(history.lastPhoto);
-                this.dateStart.set(firstDate);
-                this.dateEnd.set(lastDate);
-                this.appliedDate1.set(firstDate);
-                this.appliedDate2.set(lastDate);
+                // Set default to first date
+                this.selectedDate.set(firstDate);
+                this.appliedDate.set(firstDate);
+                // Load images for the first date automatically
+                if (firstDate) {
+                  this.loadHistoryForDate(firstDate);
+                }
               }),
               map(() => undefined),
             );
@@ -374,6 +433,13 @@ export class CameraHistoryComponent implements OnInit {
     };
   }
 
+  private normalizeTag(value: string | null | undefined): string {
+    if (!value || typeof value !== 'string') {
+      return '';
+    }
+    return value.trim().toLowerCase();
+  }
+
   private extractId(reference: string | { _id?: string }): string | null {
     if (typeof reference === 'string') {
       return reference;
@@ -387,6 +453,72 @@ export class CameraHistoryComponent implements OnInit {
     }
     const date = filename.slice(0, 8);
     return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
+  }
+
+  formatPhotoDate(filename: string | undefined): string {
+    if (!filename || filename.length < 14) {
+      return 'Unknown date';
+    }
+    // Extract date and time from filename like "20251121105533"
+    const year = filename.slice(0, 4);
+    const month = filename.slice(4, 6);
+    const day = filename.slice(6, 8);
+    const hour = filename.slice(8, 10);
+    const minute = filename.slice(10, 12);
+    const second = filename.slice(12, 14);
+    
+    // Create a date object
+    const date = new Date(
+      parseInt(year, 10),
+      parseInt(month, 10) - 1,
+      parseInt(day, 10),
+      parseInt(hour, 10),
+      parseInt(minute, 10),
+      parseInt(second, 10),
+    );
+    
+    if (Number.isNaN(date.getTime())) {
+      return 'Invalid date';
+    }
+    
+    // Format as readable date and time
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  }
+
+  formatWeeklyImageDate(filename: string | undefined): string {
+    if (!filename || filename.length < 8) {
+      return 'Unknown date';
+    }
+    
+    // Extract date from filename like "20251121105533" or just "20251121"
+    const year = filename.slice(0, 4);
+    const month = filename.slice(4, 6);
+    const day = filename.slice(6, 8);
+    
+    // Create a date object
+    const date = new Date(
+      parseInt(year, 10),
+      parseInt(month, 10) - 1,
+      parseInt(day, 10),
+    );
+    
+    if (Number.isNaN(date.getTime())) {
+      return 'Invalid date';
+    }
+    
+    // Format as readable date (without time for weekly images)
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
   }
 
   private toBackendDate(value: string): string | undefined {
@@ -517,6 +649,25 @@ export class CameraHistoryComponent implements OnInit {
       normalized = `${normalized}thumbs/`;
     }
     return `${normalized}${filename}.jpg`;
+  }
+
+  getLargeImageUrl(thumbUrl: string | null): string | null {
+    if (!thumbUrl) {
+      return null;
+    }
+    // Replace /thumbs/ with /large/ in the URL
+    return thumbUrl.replace(/\/thumbs\//i, '/large/');
+  }
+
+  openImageModal(imageUrl: string | null): void {
+    if (!imageUrl) {
+      return;
+    }
+    this.selectedImageUrl.set(imageUrl);
+  }
+
+  closeImageModal(): void {
+    this.selectedImageUrl.set(null);
   }
 
   private showToast(message: string, tone: 'success' | 'error'): void {

@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '@env';
 import {
   Camera,
+  CameraHealthResponse,
   CameraHistoryPreviewResponse,
   CameraHistoryResponse,
   CameraHistoryVideoResponse,
@@ -17,7 +18,9 @@ import { catchError, map, shareReplay, tap } from 'rxjs/operators';
 export class CameraService {
   private readonly baseUrl = `${environment.apiUrl}/cameras`;
   private readonly cameraPicsUrl = `${environment.apiUrl}/camerapics`;
+  private readonly getImageUrl = `${environment.apiUrl}/get-image`;
   private readonly mediaBase = environment.apiUrl.replace(/\/api\/?$/, '/');
+  private readonly healthBase = environment.apiUrl.replace(/\/api\/?$/, '/');
 
   private cache: Camera[] | null = null;
   private request$?: Observable<Camera[]>;
@@ -130,6 +133,44 @@ export class CameraService {
     const url = `${this.cameraPicsUrl}/preview-video/${encodeURIComponent(developerTag)}/${encodeURIComponent(projectTag)}/${encodeURIComponent(cameraName)}/`;
     return this.http.get<CameraHistoryVideoResponse>(url).pipe(
       map((response) => this.normalizeVideoResponse(response)),
+    );
+  }
+
+  getHealth(
+    developerTag: string,
+    projectTag: string,
+    cameraName: string,
+  ): Observable<CameraHealthResponse | null> {
+    if (!developerTag || !projectTag || !cameraName) {
+      return of(null);
+    }
+    const url = `${this.healthBase}health/camera/${encodeURIComponent(developerTag)}/${encodeURIComponent(projectTag)}/${encodeURIComponent(cameraName)}`;
+    return this.http.get<CameraHealthResponse>(url).pipe(
+      catchError(() => {
+        // Return null if health check fails (camera might not exist, etc.)
+        return of(null);
+      }),
+    );
+  }
+
+  deleteHistoryImage(
+    developerTag: string,
+    projectTag: string,
+    cameraName: string,
+    imageTimestamp: string,
+  ): Observable<{ message?: string; error?: string }> {
+    const url = `${this.getImageUrl}/${encodeURIComponent(developerTag)}/${encodeURIComponent(projectTag)}/${encodeURIComponent(cameraName)}/${encodeURIComponent(imageTimestamp)}`;
+    return this.http.delete<{ message?: string; error?: string }>(url);
+  }
+
+  updateMaintenanceStatus(
+    cameraId: string,
+    payload: { photoDirty?: boolean; lowImages?: boolean },
+  ): Observable<Camera> {
+    return this.http.put<Camera>(`${this.baseUrl}/${cameraId}/maintenance-status`, payload).pipe(
+      tap(() => {
+        this.clearCache();
+      }),
     );
   }
 

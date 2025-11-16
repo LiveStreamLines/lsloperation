@@ -70,7 +70,7 @@ export class ShellComponent {
       description: 'Device lifecycle and logistics',
     },
     {
-      label: 'Maintenance',
+      label: 'Task Management',
       path: '/maintenance',
       description: 'Preventive tasks and escalations',
     },

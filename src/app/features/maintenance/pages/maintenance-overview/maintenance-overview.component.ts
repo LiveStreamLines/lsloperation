@@ -24,6 +24,8 @@ import {
 import { DeveloperService } from '@core/services/developer.service';
 import { ProjectService } from '@core/services/project.service';
 import { CameraService } from '@core/services/camera.service';
+import { MemoryService } from '@core/services/memory.service';
+import { Memory, MemoryUpdateRequest } from '@core/models/memory.model';
 import { UserService } from '@core/services/user.service';
 import { Developer } from '@core/models/developer.model';
 import { Project } from '@core/models/project.model';
@@ -143,6 +145,7 @@ interface CompletionChecklist {
     viewAdjustment: boolean;
     materialReplacement: boolean;
     lockChecked: boolean;
+    memoryChanging: boolean;
   };
   removal: boolean;
   installation: boolean;
@@ -175,6 +178,7 @@ export class MaintenanceOverviewComponent implements OnInit {
   private readonly developerService = inject(DeveloperService);
   private readonly projectService = inject(ProjectService);
   private readonly cameraService = inject(CameraService);
+  private readonly memoryService = inject(MemoryService);
   private readonly userService = inject(UserService);
   private readonly inventoryService = inject(InventoryService);
   private readonly authStore = inject(AuthStore);
@@ -190,6 +194,7 @@ export class MaintenanceOverviewComponent implements OnInit {
   readonly developers = signal<Developer[]>([]);
   readonly projects = signal<Project[]>([]);
   readonly cameras = signal<Camera[]>([]);
+  readonly memories = signal<Memory[]>([]);
   readonly users = signal<User[]>([]);
 
   readonly selectedDeveloperId = signal<string | null>(null);
@@ -224,12 +229,13 @@ export class MaintenanceOverviewComponent implements OnInit {
         viewAdjustment: false,
         materialReplacement: false,
         lockChecked: false,
+        memoryChanging: false,
       },
       removal: false,
       installation: false,
       reinstallation: false,
-    addItems: false,
-    removeItems: false,
+      addItems: false,
+      removeItems: false,
     },
   });
 
@@ -320,6 +326,7 @@ export class MaintenanceOverviewComponent implements OnInit {
         viewAdjustment: false,
         materialReplacement: false,
         lockChecked: false,
+        memoryChanging: false,
       },
       removal: false,
       installation: false,
@@ -807,6 +814,37 @@ export class MaintenanceOverviewComponent implements OnInit {
         this.completeMaterialsState.set({ ...this.emptyReplaceState });
       }
 
+      // If memory was changed during this task, mark the assigned memory as removed (like memories module)
+      if (form.actions.maintenance.memoryChanging) {
+        const memory = this.getCurrentTaskMemory();
+        if (memory?._id) {
+          const now = new Date().toISOString();
+          const actor = this.currentUserName();
+          const payload: MemoryUpdateRequest = {
+            status: 'removed',
+            dateOfRemoval: now,
+            RemovalUser: actor,
+            dateOfReceive: undefined,
+            RecieveUser: undefined,
+          };
+
+          try {
+            await firstValueFrom(
+              this.memoryService.update(memory._id, payload).pipe(
+                takeUntilDestroyed(this.destroyRef),
+                catchError((error) => {
+                  console.error('Failed to update memory status during task completion', error);
+                  this.showToast('Task completed, but memory status could not be updated.', 'error');
+                  return of<Memory | null>(null);
+                }),
+              ),
+            );
+          } catch {
+            // Error already handled in catchError above
+          }
+        }
+      }
+
       const updated = await firstValueFrom(
         this.maintenanceService.completeTask(task.raw._id, finalComment).pipe(
           takeUntilDestroyed(this.destroyRef),
@@ -1001,7 +1039,14 @@ export class MaintenanceOverviewComponent implements OnInit {
           if (value) {
             next.breakdown = false;
             next.breakdownNone = false;
-            next.maintenance = { enabled: false, cleaning: false, viewAdjustment: false, materialReplacement: false, lockChecked: false };
+            next.maintenance = {
+              enabled: false,
+              cleaning: false,
+              viewAdjustment: false,
+              materialReplacement: false,
+              lockChecked: false,
+              memoryChanging: false,
+            };
             next.addItems = false;
             next.removeItems = false;
             next.installation = false;
@@ -1013,7 +1058,14 @@ export class MaintenanceOverviewComponent implements OnInit {
           if (value) {
             next.breakdown = false;
             next.breakdownNone = false;
-            next.maintenance = { enabled: false, cleaning: false, viewAdjustment: false, materialReplacement: false, lockChecked: false };
+            next.maintenance = {
+              enabled: false,
+              cleaning: false,
+              viewAdjustment: false,
+              materialReplacement: false,
+              lockChecked: false,
+              memoryChanging: false,
+            };
             next.addItems = false;
             next.removeItems = false;
             next.removal = false;
@@ -1025,7 +1077,14 @@ export class MaintenanceOverviewComponent implements OnInit {
           if (value) {
             next.breakdown = false;
             next.breakdownNone = false;
-            next.maintenance = { enabled: false, cleaning: false, viewAdjustment: false, materialReplacement: false, lockChecked: false };
+            next.maintenance = {
+              enabled: false,
+              cleaning: false,
+              viewAdjustment: false,
+              materialReplacement: false,
+              lockChecked: false,
+              memoryChanging: false,
+            };
             next.addItems = false;
             next.removeItems = false;
             next.removal = false;
@@ -1069,7 +1128,7 @@ export class MaintenanceOverviewComponent implements OnInit {
   }
 
   toggleMaintenanceOption(
-    option: 'cleaning' | 'viewAdjustment' | 'materialReplacement' | 'lockChecked',
+    option: 'cleaning' | 'viewAdjustment' | 'materialReplacement' | 'lockChecked' | 'memoryChanging',
     value: boolean,
   ): void {
     this.setCompletionActions((current) => {
@@ -1082,6 +1141,24 @@ export class MaintenanceOverviewComponent implements OnInit {
       };
       next.maintenance[option] = value;
 
+      if (option === 'memoryChanging' && value) {
+        const task = this.completeTaskModal();
+        const cameraId = task?.cameraId;
+        if (cameraId) {
+          const hasMemory = this.memories().some((memory) => {
+            const memCamera = (memory.camera || '').toString().trim().toLowerCase();
+            const cameraTag =
+              this.cameras().find((cam) => cam._id === cameraId)?.camera?.toString().trim().toLowerCase() ?? '';
+            return memCamera && cameraTag && memCamera === cameraTag;
+          });
+          if (!hasMemory) {
+            window.alert('This camera has no assigned memory.');
+          }
+        } else {
+          window.alert('Camera information is missing for this task.');
+        }
+      }
+
       return {
         next,
         releaseBreakdown: false,
@@ -1090,6 +1167,27 @@ export class MaintenanceOverviewComponent implements OnInit {
         releaseRemove: false,
       };
     });
+  }
+
+  getCurrentTaskMemory(): Memory | null {
+    const task = this.completeTaskModal();
+    const cameraId = task?.cameraId;
+    if (!cameraId) {
+      return null;
+    }
+
+    const camera = this.cameras().find((cam) => cam._id === cameraId);
+    const cameraTag = camera?.camera?.toString().trim().toLowerCase() ?? '';
+    if (!cameraTag) {
+      return null;
+    }
+
+    const memory = this.memories().find((mem) => {
+      const memCamera = (mem.camera || '').toString().trim().toLowerCase();
+      return memCamera === cameraTag;
+    });
+
+    return memory ?? null;
   }
 
   toggleBreakdownNone(value: boolean): void {
@@ -1944,6 +2042,19 @@ export class MaintenanceOverviewComponent implements OnInit {
           this.extractCameraLabel(a).localeCompare(this.extractCameraLabel(b)),
         );
         this.cameras.set(sorted);
+      });
+
+    this.memoryService
+      .getAll()
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        catchError((error) => {
+          console.error('Failed to load memories', error);
+          return of<Memory[]>([]);
+        }),
+      )
+      .subscribe((memories) => {
+        this.memories.set(memories ?? []);
       });
 
     this.userService

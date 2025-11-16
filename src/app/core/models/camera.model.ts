@@ -15,6 +15,11 @@ export interface Camera {
   server?: string;
   status?: string;
   blocked?: boolean;
+  maintenanceStatus?: {
+    photoDirty?: boolean;
+    lowImages?: boolean;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 
@@ -68,6 +73,27 @@ export interface CameraHistoryPreviewResponse {
 export interface CameraHistoryVideoResponse {
   message?: string;
   videoPath?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
+export interface CameraHealthResponse {
+  developerId: string;
+  projectId: string;
+  cameraId: string;
+  firstDay?: {
+    date: string;
+    count: number;
+  };
+  secondDay?: {
+    date: string;
+    count: number;
+  };
+  thirdDay?: {
+    date: string;
+    count: number;
+  };
+  totalImages: number;
   error?: string;
   [key: string]: unknown;
 }

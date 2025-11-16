@@ -27,6 +27,18 @@ interface UserFormState {
   accessibleServices: string[];
   canAddUser: boolean;
   canGenerateVideoAndPics: boolean;
+  // Operation permissions - camera monitor
+  canWatchCameraMonitor: boolean;
+  canCreateMonitorTask: boolean;
+  canHoldMaintenance: boolean;
+  canDeletePhoto: boolean;
+  // Operation permissions - inventory
+  canAddDeviceType: boolean;
+  canAddDeviceStock: boolean;
+  canAssignUnassignUser: boolean;
+  canAssignUnassignProject: boolean;
+  // Operation permissions - memory
+  canArchiveMemory: boolean;
   memoryRole: string;
   inventoryRole: string;
   isSaving: boolean;
@@ -459,6 +471,15 @@ export class UserFormComponent implements OnInit {
       accessibleServices: ['all'],
       canAddUser: false,
       canGenerateVideoAndPics: true,
+      canWatchCameraMonitor: false,
+      canCreateMonitorTask: false,
+      canHoldMaintenance: false,
+      canDeletePhoto: false,
+      canAddDeviceType: false,
+      canAddDeviceStock: false,
+      canAssignUnassignUser: false,
+      canAssignUnassignProject: false,
+      canArchiveMemory: false,
       memoryRole: '',
       inventoryRole: '',
       isSaving: false,
@@ -480,6 +501,15 @@ export class UserFormComponent implements OnInit {
         : ['all'],
       canAddUser: (user as any).canAddUser || false,
       canGenerateVideoAndPics: (user as any).canGenerateVideoAndPics ?? true,
+      canWatchCameraMonitor: (user as any).canWatchCameraMonitor || false,
+      canCreateMonitorTask: (user as any).canCreateMonitorTask || false,
+      canHoldMaintenance: (user as any).canHoldMaintenance || false,
+      canDeletePhoto: (user as any).canDeletePhoto || false,
+      canAddDeviceType: (user as any).canAddDeviceType || false,
+      canAddDeviceStock: (user as any).canAddDeviceStock || false,
+      canAssignUnassignUser: (user as any).canAssignUnassignUser || false,
+      canAssignUnassignProject: (user as any).canAssignUnassignProject || false,
+      canArchiveMemory: (user as any).canArchiveMemory || false,
       memoryRole: (user as any).memoryRole || '',
       inventoryRole: (user as any).inventoryRole || '',
       isSaving: false,
@@ -514,6 +544,15 @@ export class UserFormComponent implements OnInit {
       accessibleServices: form.accessibleServices,
       canAddUser: form.canAddUser,
       canGenerateVideoAndPics: form.canGenerateVideoAndPics,
+      canWatchCameraMonitor: form.canWatchCameraMonitor,
+      canCreateMonitorTask: form.canCreateMonitorTask,
+      canHoldMaintenance: form.canHoldMaintenance,
+      canDeletePhoto: form.canDeletePhoto,
+      canAddDeviceType: form.canAddDeviceType,
+      canAddDeviceStock: form.canAddDeviceStock,
+      canAssignUnassignUser: form.canAssignUnassignUser,
+      canAssignUnassignProject: form.canAssignUnassignProject,
+      canArchiveMemory: form.canArchiveMemory,
       memoryRole: form.memoryRole || undefined,
       inventoryRole: form.inventoryRole || undefined,
       addedUserId: currentUser?.id,

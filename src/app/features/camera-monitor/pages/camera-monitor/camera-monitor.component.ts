@@ -11,12 +11,14 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { CameraHistoryComponent } from '@features/camera-history/pages/camera-history/camera-history.component';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { combineLatest, of } from 'rxjs';
-import { catchError, finalize } from 'rxjs/operators';
+import { combineLatest, forkJoin, of, Observable } from 'rxjs';
+import { catchError, finalize, map } from 'rxjs/operators';
 import { environment } from '@env';
 import {
   Camera,
+  CameraHealthResponse,
   CameraLastPicture,
 } from '@core/models/camera.model';
 import { CameraService } from '@core/services/camera.service';
@@ -27,6 +29,7 @@ import { ProjectService } from '@core/services/project.service';
 import { User } from '@core/models/user.model';
 import { UserService } from '@core/services/user.service';
 import {
+  Maintenance,
   MaintenanceCreateRequest,
   MaintenanceStatus,
 } from '@core/models/maintenance.model';
@@ -40,9 +43,10 @@ type CameraStatus =
   | 'offline_network'
   | 'maintenance'
   | 'maintenance_hold'
+  | 'maintenance_long_time'
   | 'finished';
 
-type CameraStatusFilter = 'all' | CameraStatus;
+type CameraStatusFilter = 'all' | CameraStatus | 'maintenance_less_images' | 'maintenance_photo_dirty';
 
 interface CountryOption {
   value: string;
@@ -69,6 +73,11 @@ interface CameraViewModel {
   lastUpdatedAt: Date | null;
   status: CameraStatus;
   camera: Camera;
+  // Maintenance-related flags
+  maintenanceLowImages?: boolean;
+  maintenanceStatusPhotoDirty?: boolean;
+  maintenanceStatusLowImages?: boolean;
+  lastMaintenanceCompletedAt?: Date | null;
 }
 
 interface CameraHierarchyEntry {
@@ -120,6 +129,7 @@ interface EditCountryModalState {
 type SortMode = 'developer' | 'server';
 
 const UPDATE_THRESHOLD_MINUTES = 60;
+const MAINTENANCE_THRESHOLD_DAYS = 30;
 const FILTER_STORAGE_KEY = 'camera-monitor-filters';
 const NO_COUNTRY_VALUE = '__no_country__';
 const ALLOWED_COUNTRIES = ['Saudi Arabia', 'UAE'] as const;
@@ -134,7 +144,7 @@ const LEGACY_TASK_TYPES = [
 @Component({
   selector: 'app-camera-monitor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, CameraHistoryComponent],
   templateUrl: './camera-monitor.component.html',
 })
 export class CameraMonitorComponent implements OnInit {
@@ -183,10 +193,12 @@ export class CameraMonitorComponent implements OnInit {
 
   readonly projectInfoState = signal<ProjectInfoState | null>(null);
   readonly editCountryModal = signal<EditCountryModalState | null>(null);
+  readonly cameraHistoryModalCameraId = signal<string | null>(null);
 
   readonly imageLoadState = signal<Record<string, boolean>>({});
   readonly cameraStatusUpdating = signal<Set<string>>(new Set());
   readonly cameraCountryUpdating = signal<Set<string>>(new Set());
+  readonly cameraHealthData = signal<Map<string, CameraHealthResponse | null>>(new Map());
 
   readonly taskTypes = LEGACY_TASK_TYPES;
 
@@ -197,7 +209,10 @@ export class CameraMonitorComponent implements OnInit {
     { value: 'offline_hold', label: 'Offline / hold' },
     { value: 'offline_network', label: 'Offline / network' },
     { value: 'maintenance', label: 'Maintenance' },
+    { value: 'maintenance_less_images', label: 'Maintenance / less image' },
+    // No top-level "Maintenance / photo dirty" option; photo dirty is controlled via Maintenance sub-filters
     { value: 'maintenance_hold', label: 'Maintenance / hold' },
+    { value: 'maintenance_long_time', label: 'Maintenance / long time' },
     { value: 'finished', label: 'Finished' },
   ];
   readonly noCountryValue = NO_COUNTRY_VALUE;
@@ -546,9 +561,14 @@ export class CameraMonitorComponent implements OnInit {
     if (minutes === null) {
       return 'No photo available';
     }
-    if (camera.status === 'online') {
+    
+    // If camera is recently updated (within threshold), show as "Updated"
+    // This applies to both 'online' and 'maintenance' status (maintenance can be due to low image count, not offline)
+    if (minutes < UPDATE_THRESHOLD_MINUTES) {
       return 'Updated';
     }
+    
+    // Camera hasn't updated recently
     const days = Math.floor(minutes / (60 * 24));
     const hours = Math.floor((minutes % (60 * 24)) / 60);
     const mins = Math.floor(minutes % 60);
@@ -570,6 +590,7 @@ export class CameraMonitorComponent implements OnInit {
         return 'bg-amber-100 text-amber-700';
       case 'maintenance':
       case 'maintenance_hold':
+      case 'maintenance_long_time':
         return 'bg-indigo-100 text-indigo-700';
       case 'finished':
         return 'bg-slate-200 text-slate-700';
@@ -585,13 +606,15 @@ export class CameraMonitorComponent implements OnInit {
       case 'offline':
         return 'Offline';
       case 'offline_hold':
-        return 'Offline / hold';
+        return 'Offline';
       case 'offline_network':
-        return 'Offline / network';
+        return 'Offline';
       case 'maintenance':
         return 'Maintenance';
       case 'maintenance_hold':
-        return 'Maintenance / hold';
+        return 'Maintenance';
+      case 'maintenance_long_time':
+        return 'Maintenance';
       case 'finished':
         return 'Finished';
     }
@@ -619,6 +642,121 @@ export class CameraMonitorComponent implements OnInit {
       return;
     }
     this.persistCameraStatus(camera, '');
+  }
+
+  togglePhotoDirty(camera: CameraViewModel): void {
+    const nextValue = !camera.maintenanceStatusPhotoDirty;
+
+    this.cameraService
+      .updateMaintenanceStatus(camera.id, { photoDirty: nextValue })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        catchError((error) => {
+          console.error('Failed to update photo dirty status', error);
+          this.showToast('Unable to update photo dirty status.', 'error');
+          return of<Camera | null>(null);
+        }),
+      )
+      .subscribe((updated) => {
+        if (!updated) {
+          return;
+        }
+
+        const maintenanceStatus = (updated.maintenanceStatus ?? {}) as {
+          photoDirty?: boolean;
+          lowImages?: boolean;
+        };
+
+        this.cameraRecords.update((list) =>
+          list.map((item) =>
+            item.id === camera.id
+              ? (() => {
+                  const isPhotoDirty = !!maintenanceStatus.photoDirty;
+                  const projectStatusNormalized = this.normalizeProjectStatus(item.projectStatus);
+                  const updatedStatusRaw = this.normalizeCameraStatusRaw(
+                    item.camera.status as string | undefined,
+                  );
+                  const health = this.cameraHealthData().get(item.id) ?? null;
+                  const derivedStatus = this.deriveCameraStatus(
+                    projectStatusNormalized,
+                    updatedStatusRaw,
+                    item.lastUpdatedAt,
+                    health,
+                    isPhotoDirty,
+                    item.lastMaintenanceCompletedAt ?? null,
+                  );
+                  return {
+                    ...item,
+                    cameraStatusRaw: updatedStatusRaw,
+                    status: derivedStatus,
+                    maintenanceStatusPhotoDirty: isPhotoDirty,
+                    camera: { ...item.camera, maintenanceStatus },
+                  };
+                })()
+              : item,
+          ),
+        );
+
+        this.showToast(
+          maintenanceStatus.photoDirty ? 'Marked as photo dirty.' : 'Photo dirty status cleared.',
+          'success',
+        );
+      });
+  }
+
+  clearLowImagesStatus(camera: CameraViewModel): void {
+    this.cameraService
+      .updateMaintenanceStatus(camera.id, { lowImages: false })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        catchError((error) => {
+          console.error('Failed to clear low images maintenance status', error);
+          this.showToast('Unable to clear low images status.', 'error');
+          return of<Camera | null>(null);
+        }),
+      )
+      .subscribe((updated) => {
+        if (!updated) {
+          return;
+        }
+
+        const maintenanceStatus = (updated.maintenanceStatus ?? {}) as {
+          photoDirty?: boolean;
+          lowImages?: boolean;
+        };
+
+        this.cameraRecords.update((list) =>
+          list.map((item) =>
+            item.id === camera.id
+              ? (() => {
+                  const projectStatusNormalized = this.normalizeProjectStatus(item.projectStatus);
+                  const updatedStatusRaw = this.normalizeCameraStatusRaw(
+                    item.camera.status as string | undefined,
+                  );
+                  const health = this.cameraHealthData().get(item.id) ?? null;
+                  const derivedStatus = this.deriveCameraStatus(
+                    projectStatusNormalized,
+                    updatedStatusRaw,
+                    item.lastUpdatedAt,
+                    health,
+                    !!maintenanceStatus.photoDirty,
+                    item.lastMaintenanceCompletedAt ?? null,
+                  );
+
+                  return {
+                    ...item,
+                    cameraStatusRaw: updatedStatusRaw,
+                    status: derivedStatus,
+                    maintenanceStatusLowImages: !!maintenanceStatus.lowImages,
+                    camera: { ...item.camera, maintenanceStatus },
+                  };
+                })()
+              : item,
+          ),
+        );
+
+        this.showToast('Low images maintenance status cleared.', 'success');
+      });
   }
 
   openTaskModal(camera: CameraViewModel): void {
@@ -943,7 +1081,11 @@ export class CameraMonitorComponent implements OnInit {
   }
 
   openCameraHistory(camera: CameraViewModel): void {
-    this.router.navigate(['/camera-history', camera.id]);
+    this.cameraHistoryModalCameraId.set(camera.id);
+  }
+
+  closeCameraHistoryModal(): void {
+    this.cameraHistoryModalCameraId.set(null);
   }
 
   openEditCamera(camera: CameraViewModel): void {
@@ -1010,7 +1152,30 @@ export class CameraMonitorComponent implements OnInit {
       .subscribe(([developers, projects, cameras, lastPictures]) => {
         this.developers.set(this.sortByName(developers, (item) => item.developerName));
         this.projects.set(this.sortByName(projects, (item) => item.projectName));
-        this.cameraRecords.set(this.buildCameraRecords(cameras, developers, projects, lastPictures));
+
+        // Build initial camera records and show them immediately (no health/maintenance data yet)
+        const initialRecords = this.buildCameraRecords(cameras, developers, projects, lastPictures);
+        this.cameraRecords.set(initialRecords);
+
+        // Fetch health data (for all cameras with valid tags) and maintenance summaries in the background
+        forkJoin({
+          health: this.fetchCameraHealthData(initialRecords),
+          maintenance: this.fetchMaintenanceSummaries(cameras),
+        })
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe(({ health, maintenance }) => {
+            this.cameraHealthData.set(health);
+            this.cameraRecords.set(
+              this.buildCameraRecords(
+                cameras,
+                developers,
+                projects,
+                lastPictures,
+                health,
+                maintenance,
+              ),
+            );
+          });
       });
   }
 
@@ -1029,11 +1194,101 @@ export class CameraMonitorComponent implements OnInit {
       });
   }
 
+  private fetchCameraHealthData(
+    cameraRecords: CameraViewModel[],
+  ): Observable<Map<string, CameraHealthResponse | null>> {
+    const healthRequests: Record<string, Observable<CameraHealthResponse | null>> = {};
+    
+    for (const camera of cameraRecords) {
+      if (camera.developerTag && camera.projectTag && camera.name) {
+        const key = camera.id;
+        healthRequests[key] = this.cameraService.getHealth(
+          camera.developerTag,
+          camera.projectTag,
+          camera.name,
+        );
+      }
+    }
+    
+    if (Object.keys(healthRequests).length === 0) {
+      return of(new Map());
+    }
+    
+    return forkJoin(healthRequests).pipe(
+      map((results) => {
+        const healthMap = new Map<string, CameraHealthResponse | null>();
+        for (const [key, value] of Object.entries(results)) {
+          healthMap.set(key, value);
+        }
+        return healthMap;
+      }),
+      catchError((error) => {
+        console.error('Failed to fetch camera health data', error);
+        return of(new Map());
+      }),
+    );
+  }
+
+  private fetchMaintenanceSummaries(
+    cameras: Camera[],
+  ): Observable<Map<string, Date | null>> {
+    const requests: Record<string, Observable<Maintenance[]>> = {};
+
+    for (const camera of cameras) {
+      if (camera._id) {
+        requests[camera._id] = this.maintenanceService
+          .getByCamera(camera._id)
+          .pipe(catchError(() => of<Maintenance[]>([])));
+      }
+    }
+
+    if (Object.keys(requests).length === 0) {
+      return of(new Map());
+    }
+
+    return forkJoin(requests).pipe(
+      map((results) => {
+        const mapResult = new Map<string, Date | null>();
+
+        for (const [cameraId, tasks] of Object.entries(results)) {
+          const completedTasks = (tasks ?? []).filter(
+            (task) => (task.status ?? '').toLowerCase() === 'completed',
+          );
+
+          let latest: Date | null = null;
+          for (const task of completedTasks) {
+            const timestamp =
+              task.completionTime || task.startTime || task.dateOfRequest || task.createdDate;
+            if (!timestamp) {
+              continue;
+            }
+            const date = new Date(timestamp);
+            if (!Number.isNaN(date.getTime())) {
+              if (!latest || date.getTime() > latest.getTime()) {
+                latest = date;
+              }
+            }
+          }
+
+          mapResult.set(cameraId, latest);
+        }
+
+        return mapResult;
+      }),
+      catchError((error) => {
+        console.error('Failed to fetch maintenance summaries', error);
+        return of(new Map<string, Date | null>());
+      }),
+    );
+  }
+
   private buildCameraRecords(
     cameras: Camera[],
     developers: Developer[],
     projects: Project[],
     lastPictures: CameraLastPicture[],
+    healthData?: Map<string, CameraHealthResponse | null>,
+    maintenanceSummaries?: Map<string, Date | null>,
   ): CameraViewModel[] {
     const developerById = new Map(developers.map((developer) => [developer._id, developer]));
     const projectById = new Map(projects.map((project) => [project._id, project]));
@@ -1053,12 +1308,34 @@ export class CameraMonitorComponent implements OnInit {
       const project = projectById.get(projectId);
       const key = `${developerId}|${projectId}|${camera.camera}`;
       const lastPicture = lastPictureMap.get(key);
-      const lastUpdatedAt =
+      let lastUpdatedAt =
         this.parseLastPhotoTime(lastPicture?.lastPhotoTime) ??
         this.parseLegacyTimestamp(lastPicture?.lastPhoto ?? '');
+      
+      // Adjust for timezone: if the server sends UTC but we're in UTC+3, 
+      // the date pipe will show it as +3 hours. Subtract 3 hours to correct it.
+      if (lastUpdatedAt) {
+        // Subtract 3 hours (10800000 ms) to correct the timezone offset
+        lastUpdatedAt = new Date(lastUpdatedAt.getTime() - 3 * 60 * 60 * 1000);
+      }
       const projectStatusNormalized = this.normalizeProjectStatus(project?.status);
       const cameraStatusRaw = this.normalizeCameraStatusRaw(camera.status);
-      const cameraStatus = this.deriveCameraStatus(projectStatusNormalized, cameraStatusRaw, lastUpdatedAt);
+      const health = healthData?.get(camera._id) ?? null;
+      const maintenanceLowImages = !!(health && !health.error && health.totalImages < 140);
+      const maintenanceStatus = camera.maintenanceStatus as
+        | { photoDirty?: boolean; lowImages?: boolean }
+        | undefined;
+      const maintenanceStatusPhotoDirty = !!maintenanceStatus?.photoDirty;
+      const maintenanceStatusLowImages = !!maintenanceStatus?.lowImages;
+      const lastMaintenanceCompletedAt = maintenanceSummaries?.get(camera._id) ?? null;
+      const cameraStatus = this.deriveCameraStatus(
+        projectStatusNormalized,
+        cameraStatusRaw,
+        lastUpdatedAt,
+        health,
+        maintenanceStatusPhotoDirty,
+        lastMaintenanceCompletedAt,
+      );
       const country = (camera.country ?? '').trim();
 
       return {
@@ -1081,6 +1358,10 @@ export class CameraMonitorComponent implements OnInit {
         lastUpdatedAt,
         status: cameraStatus,
         camera,
+        maintenanceLowImages,
+        maintenanceStatusPhotoDirty,
+        maintenanceStatusLowImages,
+        lastMaintenanceCompletedAt,
       };
     });
   }
@@ -1089,7 +1370,43 @@ export class CameraMonitorComponent implements OnInit {
     if (!value) {
       return null;
     }
-    const date = new Date(value);
+    
+    const trimmed = value.trim();
+    
+    // If the string already includes timezone info (Z, +HH:MM, or -HH:MM), parse it directly
+    if (trimmed.includes('Z') || trimmed.match(/[+-]\d{2}:?\d{2}$/)) {
+      const date = new Date(trimmed);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+    
+    // If no timezone info, the server likely sends UTC time
+    // Parse it as UTC explicitly to avoid timezone conversion issues
+    // Try to parse common ISO formats: "2025-11-21T10:00:00" or "2025-11-21 10:00:00"
+    const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$/);
+    if (isoMatch) {
+      const [, year, month, day, hour, minute, second] = isoMatch;
+      // Create date as UTC
+      const date = new Date(Date.UTC(
+        parseInt(year, 10),
+        parseInt(month, 10) - 1,
+        parseInt(day, 10),
+        parseInt(hour, 10),
+        parseInt(minute, 10),
+        parseInt(second, 10),
+      ));
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+    
+    // Fallback: parse as-is (JavaScript will treat as local time)
+    // Then adjust by subtracting timezone offset to convert to UTC
+    // This handles cases where the string format doesn't match our regex
+    let date = new Date(trimmed);
+    if (!Number.isNaN(date.getTime())) {
+      // If parsed as local time but should be UTC, adjust by timezone offset
+      // getTimezoneOffset() returns minutes, negative for timezones ahead of UTC
+      const offsetMs = date.getTimezoneOffset() * 60000;
+      date = new Date(date.getTime() - offsetMs);
+    }
     return Number.isNaN(date.getTime()) ? null : date;
   }
 
@@ -1097,13 +1414,16 @@ export class CameraMonitorComponent implements OnInit {
     if (!value || value.length < 14) {
       return null;
     }
+    // Parse timestamp like "20251121105533" as UTC
     const year = Number.parseInt(value.slice(0, 4), 10);
     const month = Number.parseInt(value.slice(4, 6), 10) - 1;
     const day = Number.parseInt(value.slice(6, 8), 10);
     const hour = Number.parseInt(value.slice(8, 10), 10);
     const minute = Number.parseInt(value.slice(10, 12), 10);
     const second = Number.parseInt(value.slice(12, 14), 10);
-    const date = new Date(year, month, day, hour, minute, second);
+    
+    // Create date as UTC by using Date.UTC
+    const date = new Date(Date.UTC(year, month, day, hour, minute, second));
     return Number.isNaN(date.getTime()) ? null : date;
   }
 
@@ -1207,10 +1527,14 @@ export class CameraMonitorComponent implements OnInit {
 
         const updatedRaw = this.normalizeCameraStatusRaw(updated.status);
         const projectStatusNormalized = this.normalizeProjectStatus(camera.projectStatus);
+        const health = this.cameraHealthData().get(camera.id) ?? null;
         const derivedStatus = this.deriveCameraStatus(
           projectStatusNormalized,
           updatedRaw,
           camera.lastUpdatedAt,
+          health,
+          camera.maintenanceStatusPhotoDirty ?? false,
+          camera.lastMaintenanceCompletedAt ?? null,
         );
 
         this.cameraRecords.update((list) =>
@@ -1271,10 +1595,14 @@ export class CameraMonitorComponent implements OnInit {
         const updatedCountry = (updated.country ?? '').trim();
         const updatedStatusRaw = this.normalizeCameraStatusRaw(updated.status);
         const projectStatusNormalized = this.normalizeProjectStatus(camera.projectStatus);
+        const health = this.cameraHealthData().get(camera.id) ?? null;
         const derivedStatus = this.deriveCameraStatus(
           projectStatusNormalized,
           updatedStatusRaw,
           camera.lastUpdatedAt,
+          health,
+          camera.maintenanceStatusPhotoDirty ?? false,
+          camera.lastMaintenanceCompletedAt ?? null,
         );
 
         this.cameraRecords.update((list) =>
@@ -1310,35 +1638,111 @@ export class CameraMonitorComponent implements OnInit {
     projectStatus: string,
     cameraStatusRaw: string,
     lastUpdatedAt: Date | null,
+    health: CameraHealthResponse | null = null,
+    hasPhotoDirty = false,
+    lastMaintenanceCompletedAt: Date | null = null,
   ): CameraStatus {
-    switch (cameraStatusRaw) {
-      case 'hold':
-        return 'offline_hold';
-      case 'network':
-        return 'offline_network';
-      case 'finished':
-        return 'finished';
+    // 1) Finished always wins
+    if (cameraStatusRaw === 'finished') {
+      return 'finished';
     }
 
-    switch (projectStatus) {
-      case 'maintenance_hold':
-        return 'maintenance_hold';
-      case 'maintenance':
-        return 'maintenance';
-      default: {
-        const minutes = this.minutesSince(lastUpdatedAt);
-        if (minutes !== null && minutes < UPDATE_THRESHOLD_MINUTES) {
-          return 'online';
-        }
-        return 'offline';
+    // 2) Determine if camera is offline based on last update time
+    const minutes = this.minutesSince(lastUpdatedAt);
+    const isOffline = minutes === null || minutes >= UPDATE_THRESHOLD_MINUTES;
+
+    if (isOffline) {
+      // For offline cameras, keep statuses in the offline family
+      if (cameraStatusRaw === 'network') {
+        return 'offline_network';
       }
+      if (cameraStatusRaw === 'hold') {
+        return 'offline_hold';
+      }
+      return 'offline';
     }
+
+    // 3) Camera is online – compute maintenance-related flags
+    const hasLowImages = !!(health && health.totalImages < 140 && !health.error);
+
+    let isLongTime = false;
+    if (lastMaintenanceCompletedAt) {
+      const diffMs = this.currentTime() - lastMaintenanceCompletedAt.getTime();
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      if (diffDays > MAINTENANCE_THRESHOLD_DAYS) {
+        isLongTime = true;
+      }
+    } else {
+      // Never maintained -> long time
+      isLongTime = true;
+    }
+
+    const projectMaintenance =
+      projectStatus === 'maintenance' || projectStatus === 'maintenance_hold';
+
+    const hasAnyMaintenanceReason =
+      projectMaintenance || hasLowImages || hasPhotoDirty || isLongTime;
+
+    // 4) If there is no maintenance reason at all → stay Online
+    if (!hasAnyMaintenanceReason) {
+      return 'online';
+    }
+
+    // 5) There is at least one maintenance reason – choose the maintenance status variant
+    // Hold from raw status or project forces maintenance_hold
+    if (cameraStatusRaw === 'hold' || projectStatus === 'maintenance_hold') {
+      return 'maintenance_hold';
+    }
+
+    // Long time takes precedence over the base "maintenance" status
+    if (isLongTime) {
+      return 'maintenance_long_time';
+    }
+
+    // Otherwise, generic maintenance (less image, photo dirty, or project maintenance)
+    return 'maintenance';
   }
 
   private matchesCameraStatus(camera: CameraViewModel, status: CameraStatusFilter): boolean {
     if (status === 'all') {
       return true;
     }
+
+    // Grouped offline filter: includes offline + its sub-statuses
+    if (status === 'offline') {
+      return (
+        camera.status === 'offline' ||
+        camera.status === 'offline_hold' ||
+        camera.status === 'offline_network'
+      );
+    }
+
+    // Grouped maintenance "all" filter: includes all maintenance variants
+    if (status === 'maintenance') {
+      return (
+        camera.status === 'maintenance' ||
+        camera.status === 'maintenance_hold' ||
+        camera.status === 'maintenance_long_time'
+      );
+    }
+
+    // Virtual filter: maintenance / less image (maintenance, but exclude hold tab)
+    if (status === 'maintenance_less_images') {
+      const isMaintenanceStatus =
+        camera.status === 'maintenance' ||
+        camera.status === 'maintenance_long_time';
+      const hasLessImages = !!(camera.maintenanceLowImages || camera.maintenanceStatusLowImages);
+      return isMaintenanceStatus && hasLessImages;
+    }
+
+    // Virtual filter: maintenance / photo dirty (maintenance, but exclude hold tab)
+    if (status === 'maintenance_photo_dirty') {
+      const isMaintenanceStatus =
+        camera.status === 'maintenance' || camera.status === 'maintenance_long_time';
+      return isMaintenanceStatus && !!camera.maintenanceStatusPhotoDirty;
+    }
+
+    // Exact match for all other statuses
     return camera.status === status;
   }
 

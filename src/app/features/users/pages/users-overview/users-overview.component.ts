@@ -44,6 +44,7 @@ export class UsersOverviewComponent implements OnInit {
   readonly selectedDeveloperId = signal<string | null>(null);
   readonly selectedProjectId = signal<string | null>(null);
   readonly selectedCameraId = signal<string | null>(null);
+  readonly selectedRole = signal<string>('ALL');
   readonly searchTerm = signal('');
   readonly currentSortColumn = signal<SortColumn>('name');
   readonly currentSortDirection = signal<SortDirection>('asc');
@@ -68,6 +69,17 @@ export class UsersOverviewComponent implements OnInit {
   readonly accessibleCameras = computed(() => {
     const user = this.authStore.user();
     return user?.accessibleCameras || [];
+  });
+
+  readonly availableRoles = computed(() => {
+    const roles = new Set<string>();
+    for (const user of this.users()) {
+      const role = (user.role || '').trim();
+      if (role) {
+        roles.add(role);
+      }
+    }
+    return ['ALL', ...Array.from(roles).sort((a, b) => a.localeCompare(b))];
   });
 
   readonly sortedDevelopers = computed(() => {
@@ -108,9 +120,11 @@ export class UsersOverviewComponent implements OnInit {
     const developerId = this.selectedDeveloperId();
     const projectId = this.selectedProjectId();
     const cameraId = this.selectedCameraId();
+    const selectedRole = this.selectedRole();
 
     filtered = filtered.filter((user) => {
       const isAdmin = user.role === 'Super Admin';
+      const matchesRole = selectedRole === 'ALL' || (user.role || '').trim() === selectedRole;
       const matchesDeveloper =
         !developerId ||
         developerId === 'ALL' ||
@@ -128,9 +142,9 @@ export class UsersOverviewComponent implements OnInit {
         user.accessibleCameras?.[0] === 'all';
 
       if (this.isSuperAdmin() || this.accessibleDevelopers()[0] === 'all') {
-        return isAdmin || (matchesDeveloper && matchesProject && matchesCamera);
+        return (isAdmin || (matchesDeveloper && matchesProject && matchesCamera)) && matchesRole;
       }
-      return matchesDeveloper && matchesProject && matchesCamera;
+      return matchesDeveloper && matchesProject && matchesCamera && matchesRole;
     });
 
     // Apply sorting
@@ -210,6 +224,11 @@ export class UsersOverviewComponent implements OnInit {
       .subscribe((users) => {
         this.users.set(users ?? []);
       });
+  }
+
+  onRoleChange(role: string): void {
+    this.selectedRole.set(role || 'ALL');
+    this.currentPage.set(0);
   }
 
   loadDevelopers(): void {
