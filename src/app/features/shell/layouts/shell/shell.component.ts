@@ -35,9 +35,9 @@ export class ShellComponent {
 
   readonly navItems: NavItem[] = [
     {
-      label: 'Dashboard',
-      path: '/dashboard',
-      description: 'Executive overview and live metrics',
+      label: 'Camera monitor',
+      path: '/camera-monitor',
+      description: 'Live updates and real-time snapshots',
     },
     {
       label: 'Users',
@@ -58,11 +58,6 @@ export class ShellComponent {
       label: 'Cameras',
       path: '/cameras',
       description: 'Fleet visibility and stream quality',
-    },
-    {
-      label: 'Camera monitor',
-      path: '/camera-monitor',
-      description: 'Live updates and real-time snapshots',
     },
     {
       label: 'Inventory',

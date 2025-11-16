@@ -105,6 +105,9 @@ export class UsersOverviewComponent implements OnInit {
   readonly filteredUsers = computed(() => {
     let filtered = [...this.users()];
 
+    // Show only Super Admins and Admins in the overview
+    filtered = filtered.filter((user) => user.role === 'Super Admin' || user.role === 'Admin');
+
     // Apply search filter
     const term = this.searchTerm().toLowerCase().trim();
     if (term) {
