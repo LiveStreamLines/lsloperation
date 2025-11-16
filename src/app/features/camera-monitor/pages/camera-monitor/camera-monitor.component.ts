@@ -885,6 +885,9 @@ export class CameraMonitorComponent implements OnInit {
       return;
     }
 
+    const currentUser = this.authStore.user();
+    // Get user ID - try both 'id' and '_id' fields to handle different data formats
+    const userId = currentUser?.id || (currentUser as any)?.['_id'] || (currentUser as any)?._id;
     const payload: MaintenanceCreateRequest = {
       taskType: form.taskType.trim(),
       taskDescription: form.taskDescription.trim(),
@@ -895,7 +898,9 @@ export class CameraMonitorComponent implements OnInit {
       projectId: camera.projectId,
       dateOfRequest: new Date().toISOString(),
       userComment: '',
-    };
+      addedUserId: userId as string | undefined,
+      addedUserName: currentUser?.name,
+    } as any;
 
     this.taskForm.update((state) => ({ ...state, isSaving: true, error: null }));
 

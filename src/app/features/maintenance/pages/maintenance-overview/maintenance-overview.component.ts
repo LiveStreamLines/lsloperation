@@ -342,10 +342,13 @@ export class MaintenanceOverviewComponent implements OnInit {
 
   readonly currentUserId = computed(() => {
     const user = this.authStore.user();
-    return user ? (user['_id'] as string) : null;
+    if (!user) return null;
+    // Get user ID - try both 'id' and '_id' fields to handle different data formats
+    return (user.id || (user as any)?.['_id'] || (user as any)?._id) as string | null;
   });
   readonly currentUserName = computed(() => this.authStore.user()?.name ?? 'System');
   readonly isSuperAdmin = computed(() => this.authStore.user()?.role === 'Super Admin');
+  readonly canCreateTask = computed(() => (this.authStore.user() as any)?.canCreateMonitorTask ?? false);
 
   private readonly baseStatusOptions: FilterOption[] = [
     { value: 'all', label: 'All statuses' },
@@ -456,20 +459,45 @@ export class MaintenanceOverviewComponent implements OnInit {
         if (taskType && task.taskType !== taskType) {
           return false;
         }
-        if (status && task.status !== status) {
-          return false;
-        }
 
         if (isSuperAdmin) {
           if (userId) {
             return task.assignedUsers.some((user) => user.id === userId);
           }
+          // Super Admin: apply status filter
+          if (status && task.status !== status) {
+            return false;
+          }
           return true; // Super Admin sees all tasks
         }
 
-        // Non-Super Admin: only show tasks assigned to them
+        // Non-Super Admin: show tasks assigned to them OR tasks they created
         if (currentUserId) {
-          return task.assignedUsers.some((user) => user.id === currentUserId);
+          const isAssigned = task.assignedUsers.some((user) => user.id === currentUserId);
+          const rawTask = task.raw;
+          // Check various possible fields for creator ID (handle both string and object ID formats)
+          const createdBy = (rawTask as any).addedUserId || 
+                           (rawTask as any).createdBy || 
+                           (rawTask as any).createdById ||
+                           (rawTask as any).addedBy;
+          // Convert both to strings for comparison to handle any type mismatches
+          const isCreatedByUser = createdBy && String(createdBy) === String(currentUserId);
+          
+          // If user created the task, show it in all statuses (regardless of permission flag)
+          // This ensures users can always see tasks they created
+          if (isCreatedByUser) {
+            return true; // Show tasks created by user regardless of status filter
+          }
+          
+          // For assigned tasks (not created by user), apply status filter
+          if (isAssigned) {
+            if (status && task.status !== status) {
+              return false;
+            }
+            return true;
+          }
+          
+          return false;
         }
 
         return false; // If no currentUserId, don't show any tasks
