@@ -34,6 +34,7 @@ import { User } from '@core/models/user.model';
 import { UserService } from '@core/services/user.service';
 import { Memory } from '@core/models/memory.model';
 import { MemoryService } from '@core/services/memory.service';
+import { AuthStore } from '@core/auth/auth.store';
 
 interface CameraHistoryTags {
   developerTag: string;
@@ -60,6 +61,7 @@ export class CameraHistoryComponent implements OnInit {
   private readonly inventoryService = inject(InventoryService);
   private readonly userService = inject(UserService);
   private readonly memoryService = inject(MemoryService);
+  private readonly authStore = inject(AuthStore);
   private readonly mediaBase = environment.apiUrl.replace(/\/api\/?$/, '/');
 
   readonly isLoading = signal(true);
@@ -82,6 +84,8 @@ export class CameraHistoryComponent implements OnInit {
 
   readonly toast = signal<{ message: string; tone: 'success' | 'error' } | null>(null);
   readonly selectedImageUrl = signal<string | null>(null);
+
+  readonly canDeletePhoto = computed(() => (this.authStore.user() as any)?.canDeletePhoto ?? false);
 
   readonly hasHistory = computed(() => {
     const data = this.history();

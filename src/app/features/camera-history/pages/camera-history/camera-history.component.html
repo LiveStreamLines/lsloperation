@@ -361,13 +361,15 @@
                           class="w-full rounded-2xl border border-slate-100 object-cover shadow cursor-pointer transition hover:opacity-80"
                           (click)="openImageModal(buildHistoryImageUrl(photo)!)"
                         />
-                        <button
-                          type="button"
-                          class="absolute top-2 right-2 hidden group-hover:inline-flex items-center rounded-full bg-rose-600/90 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-md hover:bg-rose-700"
-                          (click)="onDeletePhoto(photo); $event.stopPropagation()"
-                        >
-                          Delete
-                        </button>
+                        @if (canDeletePhoto()) {
+                          <button
+                            type="button"
+                            class="absolute top-2 right-2 hidden group-hover:inline-flex items-center rounded-full bg-rose-600/90 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-md hover:bg-rose-700"
+                            (click)="onDeletePhoto(photo); $event.stopPropagation()"
+                          >
+                            Delete
+                          </button>
+                        }
                       </div>
                       <p class="text-[11px] text-slate-500 text-center">
                         {{ formatPhotoDate(photo) }}

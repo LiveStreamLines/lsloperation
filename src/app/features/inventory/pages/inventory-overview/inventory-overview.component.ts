@@ -27,6 +27,7 @@ import { Project } from '@core/models/project.model';
 import { Camera } from '@core/models/camera.model';
 import { DeviceType } from '@core/models/device-type.model';
 import { User } from '@core/models/user.model';
+import { AuthStore } from '@core/auth/auth.store';
 
 interface InventoryMetricCard {
   title: string;
@@ -54,6 +55,7 @@ export class InventoryOverviewComponent implements OnInit {
   private readonly cameraService = inject(CameraService);
   private readonly deviceTypeService = inject(DeviceTypeService);
   private readonly userService = inject(UserService);
+  private readonly authStore = inject(AuthStore);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly items = signal<InventoryItem[]>([]);
@@ -148,6 +150,16 @@ export class InventoryOverviewComponent implements OnInit {
     { value: 'user_assigned', label: 'User Assigned' },
     { value: 'retired', label: 'Retired' },
   ];
+
+  readonly currentUser = computed(() => this.authStore.user());
+  readonly isSuperAdmin = computed(() => this.currentUser()?.role === 'Super Admin');
+  readonly accessibleDevelopers = computed(() => this.currentUser()?.accessibleDevelopers ?? []);
+  
+  // Permission checks
+  readonly canAddDeviceType = computed(() => (this.currentUser() as any)?.canAddDeviceType ?? false);
+  readonly canAddDeviceStock = computed(() => (this.currentUser() as any)?.canAddDeviceStock ?? false);
+  readonly canAssignUnassignUser = computed(() => (this.currentUser() as any)?.canAssignUnassignUser ?? false);
+  readonly canAssignUnassignProject = computed(() => (this.currentUser() as any)?.canAssignUnassignProject ?? false);
 
   readonly developerMap = computed(() => new Map(this.developers().map((developer) => [developer._id, developer])));
   readonly projectMap = computed(() => new Map(this.allProjects().map((project) => [project._id, project])));
@@ -1271,7 +1283,16 @@ export class InventoryOverviewComponent implements OnInit {
       .getAll()
       .pipe(takeUntilDestroyed(this.destroyRef), catchError(() => of<Developer[]>([])))
       .subscribe((developers) => {
-        this.developers.set(this.sortDevelopers(developers));
+        // Filter developers based on user's accessibleDevelopers
+        let filteredDevelopers = developers;
+        const user = this.currentUser();
+        if (user && !this.isSuperAdmin()) {
+          const accessible = this.accessibleDevelopers();
+          if (accessible.length > 0 && accessible[0] !== 'all') {
+            filteredDevelopers = developers.filter((dev) => accessible.includes(dev._id));
+          }
+        }
+        this.developers.set(this.sortDevelopers(filteredDevelopers));
       });
   }
 

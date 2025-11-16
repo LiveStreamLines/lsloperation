@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import {
   Router,
   RouterLink,
@@ -33,50 +33,79 @@ export class ShellComponent {
   readonly mobileSidebarOpen = signal(false);
   readonly isSigningOut = signal(false);
 
-  readonly navItems: NavItem[] = [
-    {
-      label: 'Camera monitor',
-      path: '/camera-monitor',
-      description: 'Live updates and real-time snapshots',
-    },
-    {
-      label: 'Users',
-      path: '/users',
-      description: 'Manage roles, access, and sessions',
-    },
-    {
-      label: 'Developers',
-      path: '/developers',
-      description: 'Partner roster and onboarding status',
-    },
-    {
-      label: 'Projects',
-      path: '/projects',
-      description: 'Project health and milestones',
-    },
-    {
-      label: 'Cameras',
-      path: '/cameras',
-      description: 'Fleet visibility and stream quality',
-    },
-    {
-      label: 'Inventory',
-      path: '/inventory',
-      description: 'Device lifecycle and logistics',
-    },
-    {
+  readonly user = this.authStore.user;
+
+  readonly navItems = computed(() => {
+    const currentUser = this.user();
+    if (!currentUser) return [];
+
+    const isSuperAdmin = currentUser.role === 'Super Admin';
+    const items: NavItem[] = [];
+
+    // Super Admin sees everything, others see based on permissions
+    if (isSuperAdmin || (currentUser as any).hasCameraMonitorAccess) {
+      items.push({
+        label: 'Camera monitor',
+        path: '/camera-monitor',
+        description: 'Live updates and real-time snapshots',
+      });
+    }
+
+    // Users - only show for Super Admin
+    if (isSuperAdmin) {
+      items.push({
+        label: 'Users',
+        path: '/users',
+        description: 'Manage roles, access, and sessions',
+      });
+    }
+
+    // Developers, Projects, Cameras - Super Admin or users with manage permission
+    if (isSuperAdmin || (currentUser as any).canManageDevProjCam) {
+      items.push({
+        label: 'Developers',
+        path: '/developers',
+        description: 'Partner roster and onboarding status',
+      });
+      items.push({
+        label: 'Projects',
+        path: '/projects',
+        description: 'Project health and milestones',
+      });
+      items.push({
+        label: 'Cameras',
+        path: '/cameras',
+        description: 'Fleet visibility and stream quality',
+      });
+    }
+
+    // Inventory - Super Admin or users with inventory access
+    if (isSuperAdmin || (currentUser as any).hasInventoryAccess) {
+      items.push({
+        label: 'Inventory',
+        path: '/inventory',
+        description: 'Device lifecycle and logistics',
+      });
+    }
+
+    // Task Management - always show
+    items.push({
       label: 'Task Management',
       path: '/maintenance',
       description: 'Preventive tasks and escalations',
-    },
-    {
-      label: 'Memories',
-      path: '/memories',
-      description: 'Marketing assets and curated media',
-    },
-  ];
+    });
 
-  readonly user = this.authStore.user;
+    // Memories - Super Admin or users with memory access
+    if (isSuperAdmin || (currentUser as any).hasMemoryAccess) {
+      items.push({
+        label: 'Memories',
+        path: '/memories',
+        description: 'Marketing assets and curated media',
+      });
+    }
+
+    return items;
+  });
 
   toggleSidebar(): void {
     this.mobileSidebarOpen.update((open) => !open);

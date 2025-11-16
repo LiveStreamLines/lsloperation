@@ -22,3 +22,21 @@ export const authGuard: CanActivateFn = () => evaluateAuth();
 
 export const authCanMatch: CanMatchFn = () => evaluateAuth();
 
+// Guard for camera monitor access - redirects to maintenance if no access
+export const cameraMonitorGuard: CanActivateFn = () => {
+  const authStore = inject(AuthStore);
+  const router = inject(Router);
+  const user = authStore.user();
+
+  if (!user) {
+    return router.createUrlTree(['/auth/login']);
+  }
+
+  // If user doesn't have camera monitor access, redirect to maintenance
+  if (!(user as any).hasCameraMonitorAccess) {
+    return router.createUrlTree(['/maintenance']);
+  }
+
+  return true;
+};
+

@@ -21,6 +21,14 @@ interface UserFormState {
   email: string;
   phone: string;
   role: string;
+  // Region access (for Admins)
+  hasUaeAccess: boolean;
+  hasSaudiAccess: boolean;
+  // High-level operation permissions
+  canManageDevProjCam: boolean;
+  hasCameraMonitorAccess: boolean;
+  hasInventoryAccess: boolean;
+  hasMemoryAccess: boolean;
   accessibleDevelopers: string[];
   accessibleProjects: string[];
   accessibleCameras: string[];
@@ -68,7 +76,7 @@ const INVENTORY_ROLES = [
   { value: 'stock', viewValue: 'Inventory Stockeeper' },
 ];
 
-const ROLES = ['Super Admin', 'Admin', 'User'];
+const ROLES = ['Super Admin', 'Admin'];
 
 @Component({
   selector: 'app-user-form',
@@ -188,7 +196,9 @@ export class UserFormComponent implements OnInit {
       this.userId.set(userId);
       this.loadUser(userId);
     } else {
+      // Create mode – no need to block on loading, show the form immediately
       this.isEditMode.set(false);
+      this.isLoading.set(false);
     }
 
     this.loadDevelopers();
@@ -341,6 +351,12 @@ export class UserFormComponent implements OnInit {
     if (role === 'Super Admin') {
       this.userForm.update((form) => ({
         ...form,
+        canManageDevProjCam: false,
+        hasCameraMonitorAccess: false,
+        hasInventoryAccess: false,
+        hasMemoryAccess: false,
+        hasUaeAccess: false,
+        hasSaudiAccess: false,
         accessibleDevelopers: [],
         accessibleProjects: [],
         accessibleCameras: [],
@@ -353,16 +369,142 @@ export class UserFormComponent implements OnInit {
     } else if (role === 'Admin') {
       this.userForm.update((form) => ({
         ...form,
+        canManageDevProjCam: form.canManageDevProjCam || false,
+        hasCameraMonitorAccess: form.hasCameraMonitorAccess || false,
+        hasInventoryAccess: form.hasInventoryAccess || false,
+        hasMemoryAccess: form.hasMemoryAccess || false,
+        // Reset region access flags when switching to Admin
+        hasUaeAccess: false,
+        hasSaudiAccess: false,
         memoryRole: form.memoryRole || '',
         inventoryRole: form.inventoryRole || '',
       }));
     } else {
       this.userForm.update((form) => ({
         ...form,
+        canManageDevProjCam: false,
+        hasCameraMonitorAccess: false,
+        hasInventoryAccess: false,
+        hasMemoryAccess: false,
+        hasUaeAccess: false,
+        hasSaudiAccess: false,
         memoryRole: '',
         inventoryRole: '',
       }));
     }
+  }
+
+  onRegionAccessChange(region: 'uae' | 'saudi', value: boolean): void {
+    this.userForm.update((form) => ({
+      ...form,
+      hasUaeAccess: region === 'uae' ? value : form.hasUaeAccess,
+      hasSaudiAccess: region === 'saudi' ? value : form.hasSaudiAccess,
+    }));
+
+    this.applyRegionAccessRules();
+  }
+
+  private applyRegionAccessRules(): void {
+    const form = this.userForm();
+    const devs = this.developers();
+
+    // If neither region is selected, clear region-based selections but keep manual control
+    if (!form.hasUaeAccess && !form.hasSaudiAccess) {
+      this.userForm.update((f) => ({
+        ...f,
+        accessibleDevelopers: [],
+        accessibleProjects: [],
+        accessibleCameras: [],
+      }));
+      this.projects.set([]);
+      this.cameras.set([]);
+      return;
+    }
+
+    // Collect developers based on region
+    let selectedDeveloperIds: string[] = [];
+
+    if (form.hasSaudiAccess) {
+      const saudiIds = devs
+        .filter((d) => (d.address?.country || '').toLowerCase().includes('saudi'))
+        .map((d) => d._id);
+      selectedDeveloperIds = [...selectedDeveloperIds, ...saudiIds];
+    }
+
+    if (form.hasUaeAccess) {
+      // UAE access = developers where there is no country field
+      const uaeIds = devs
+        .filter((d) => !d.address || !d.address.country)
+        .map((d) => d._id);
+      selectedDeveloperIds = [...selectedDeveloperIds, ...uaeIds];
+    }
+
+    // Ensure uniqueness
+    selectedDeveloperIds = Array.from(new Set(selectedDeveloperIds));
+
+    if (form.hasUaeAccess && form.hasSaudiAccess) {
+      // Both selected → all developers, projects always all, cameras always all
+      this.userForm.update((f) => ({
+        ...f,
+        accessibleDevelopers: ['all'],
+        accessibleProjects: ['all'],
+        accessibleCameras: ['all'],
+      }));
+      this.projects.set([]);
+      this.cameras.set([]);
+    } else {
+      // Only one region selected → region-based developers, but projects and cameras always all
+      this.userForm.update((f) => ({
+        ...f,
+        accessibleDevelopers: selectedDeveloperIds,
+        accessibleProjects: ['all'],
+        accessibleCameras: ['all'],
+      }));
+      this.projects.set([]);
+      this.cameras.set([]);
+    }
+  }
+
+  onCameraMonitorAccessChange(value: boolean): void {
+    this.userForm.update((form) => ({
+      ...form,
+      hasCameraMonitorAccess: value,
+      ...(value
+        ? {}
+        : {
+            canWatchCameraMonitor: false,
+            canCreateMonitorTask: false,
+            canHoldMaintenance: false,
+            canDeletePhoto: false,
+          }),
+    }));
+  }
+
+  onInventoryAccessChange(value: boolean): void {
+    this.userForm.update((form) => ({
+      ...form,
+      hasInventoryAccess: value,
+      ...(value
+        ? {}
+        : {
+            canAddDeviceType: false,
+            canAddDeviceStock: false,
+            canAssignUnassignUser: false,
+            canAssignUnassignProject: false,
+          }),
+    }));
+  }
+
+  onMemoryAccessChange(value: boolean): void {
+    this.userForm.update((form) => ({
+      ...form,
+      hasMemoryAccess: value,
+      ...(value
+        ? {}
+        : {
+            canArchiveMemory: false,
+          }),
+    }));
   }
 
   onDeveloperChange(event: Event): void {
@@ -464,7 +606,13 @@ export class UserFormComponent implements OnInit {
       name: '',
       email: '',
       phone: '',
-      role: 'User',
+      role: 'Admin',
+      hasUaeAccess: false,
+      hasSaudiAccess: false,
+      canManageDevProjCam: false,
+      hasCameraMonitorAccess: false,
+      hasInventoryAccess: false,
+      hasMemoryAccess: false,
       accessibleDevelopers: [],
       accessibleProjects: [],
       accessibleCameras: [],
@@ -493,6 +641,28 @@ export class UserFormComponent implements OnInit {
       email: user.email || '',
       phone: user.phone || '',
       role: (user.role as string) || 'User',
+      hasUaeAccess: false,
+      hasSaudiAccess: false,
+      canManageDevProjCam: (user as any).canManageDevProjCam || false,
+      hasCameraMonitorAccess: (user as any).hasCameraMonitorAccess !== undefined
+        ? !!(user as any).hasCameraMonitorAccess
+        : !!(
+            (user as any).canWatchCameraMonitor ||
+            (user as any).canCreateMonitorTask ||
+            (user as any).canHoldMaintenance ||
+            (user as any).canDeletePhoto
+          ),
+      hasInventoryAccess: (user as any).hasInventoryAccess !== undefined
+        ? !!(user as any).hasInventoryAccess
+        : !!(
+            (user as any).canAddDeviceType ||
+            (user as any).canAddDeviceStock ||
+            (user as any).canAssignUnassignUser ||
+            (user as any).canAssignUnassignProject
+          ),
+      hasMemoryAccess: (user as any).hasMemoryAccess !== undefined
+        ? !!(user as any).hasMemoryAccess
+        : !!((user as any).canArchiveMemory),
       accessibleDevelopers: user.accessibleDevelopers || [],
       accessibleProjects: user.accessibleProjects || [],
       accessibleCameras: user.accessibleCameras || [],
@@ -541,9 +711,15 @@ export class UserFormComponent implements OnInit {
       accessibleDevelopers: form.accessibleDevelopers,
       accessibleProjects: form.accessibleProjects,
       accessibleCameras: form.accessibleCameras,
-      accessibleServices: form.accessibleServices,
-      canAddUser: form.canAddUser,
-      canGenerateVideoAndPics: form.canGenerateVideoAndPics,
+      // Always store services as "all"
+      accessibleServices: ['all'],
+      canAddUser: false, // Removed from UI, always set to false
+      // Always allow generating video and pics
+      canGenerateVideoAndPics: true,
+      canManageDevProjCam: form.canManageDevProjCam,
+      hasCameraMonitorAccess: form.hasCameraMonitorAccess,
+      hasInventoryAccess: form.hasInventoryAccess,
+      hasMemoryAccess: form.hasMemoryAccess,
       canWatchCameraMonitor: form.canWatchCameraMonitor,
       canCreateMonitorTask: form.canCreateMonitorTask,
       canHoldMaintenance: form.canHoldMaintenance,

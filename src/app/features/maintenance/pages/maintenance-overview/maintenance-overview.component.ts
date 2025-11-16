@@ -340,7 +340,10 @@ export class MaintenanceOverviewComponent implements OnInit {
 
   readonly completionCommentMin = MIN_COMPLETION_COMMENT_LENGTH;
 
-  readonly currentUserId = computed(() => this.authStore.user()?.id ?? null);
+  readonly currentUserId = computed(() => {
+    const user = this.authStore.user();
+    return user ? (user['_id'] as string) : null;
+  });
   readonly currentUserName = computed(() => this.authStore.user()?.name ?? 'System');
   readonly isSuperAdmin = computed(() => this.authStore.user()?.role === 'Super Admin');
 
@@ -461,14 +464,15 @@ export class MaintenanceOverviewComponent implements OnInit {
           if (userId) {
             return task.assignedUsers.some((user) => user.id === userId);
           }
-          return true;
+          return true; // Super Admin sees all tasks
         }
 
+        // Non-Super Admin: only show tasks assigned to them
         if (currentUserId) {
           return task.assignedUsers.some((user) => user.id === currentUserId);
         }
 
-        return true;
+        return false; // If no currentUserId, don't show any tasks
       })
       .sort((a, b) => this.compareDatesDesc(a.dateOfRequest, b.dateOfRequest));
   });

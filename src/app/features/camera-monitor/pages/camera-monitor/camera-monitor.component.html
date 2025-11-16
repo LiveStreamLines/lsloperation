@@ -1,31 +1,20 @@
-<section class="relative space-y-8">
-  <header class="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-      <div class="max-w-2xl space-y-2">
-        <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">Live camera monitor</p>
-        <h1 class="text-3xl font-bold text-slate-900">Field fleet overview</h1>
-        <p class="text-sm text-slate-500">
-          Track camera health, review recent imagery, and dispatch maintenance tasks without leaving this screen.
-          Filters match the legacy workflow so you can pivot by developer, project, or update state.
-        </p>
-      </div>
-      <div class="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-          (click)="refresh()"
-          [disabled]="isRefreshing() || isLoading()"
-        >
-          <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
-            <path
-              d="M3.172 7A7.001 7.001 0 0117 10a1 1 0 11-2 0 5 5 0 00-8.9-3H8a1 1 0 010 2H3a1 1 0 01-1-1V3a1 1 0 012 0v2a6.964 6.964 0 011.172 2zM17 13l.001 4a1 1 0 01-1 1H12a1 1 0 010-2h2.899A5.002 5.002 0 007 11a1 1 0 010-2 7 7 0 018.828 5H12a1 1 0 110-2h5a1 1 0 011 1z"
-            />
-          </svg>
-          {{ isRefreshing() ? 'Refreshing…' : 'Refresh data' }}
-        </button>
-      </div>
-    </div>
-  </header>
+<section class="relative space-y-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-xl font-semibold text-slate-900">Camera Monitor</h1>
+    <button
+      type="button"
+      class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+      (click)="refresh()"
+      [disabled]="isRefreshing() || isLoading()"
+    >
+      <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
+        <path
+          d="M3.172 7A7.001 7.001 0 0117 10a1 1 0 11-2 0 5 5 0 00-8.9-3H8a1 1 0 010 2H3a1 1 0 01-1-1V3a1 1 0 012 0v2a6.964 6.964 0 011.172 2zM17 13l.001 4a1 1 0 01-1 1H12a1 1 0 010-2h2.899A5.002 5.002 0 007 11a1 1 0 010-2 7 7 0 018.828 5H12a1 1 0 110-2h5a1 1 0 011 1z"
+        />
+      </svg>
+      {{ isRefreshing() ? 'Refreshing…' : 'Refresh data' }}
+    </button>
+  </div>
 
   @if (toast()) {
     <div class="fixed right-6 top-6 z-50">
@@ -285,7 +274,7 @@
           (change)="onProjectSelect($any($event.target).value)"
         >
           <option value="">All projects</option>
-          @for (project of projects(); track project._id) {
+          @for (project of filteredProjects(); track project._id) {
             <option [value]="project._id">{{ project.projectName }}</option>
           }
         </select>
@@ -563,7 +552,7 @@
                             >
                               Active
                             </button>
-                            @if (camera.status !== 'online') {
+                            @if (camera.status !== 'online' && (isSuperAdmin() || canHoldTask())) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -577,8 +566,9 @@
                               >
                                 Hold
                               </button>
+                            }
+                            @if (isSuperAdmin()) {
                               @if (
-                                isSuperAdmin() &&
                                 camera.status !== 'offline' &&
                                 camera.status !== 'offline_hold' &&
                                 camera.status !== 'offline_network' &&
@@ -601,7 +591,8 @@
                               @if (
                                 camera.status !== 'maintenance' &&
                                 camera.status !== 'maintenance_hold' &&
-                                camera.status !== 'maintenance_long_time'
+                                camera.status !== 'maintenance_long_time' &&
+                                (isSuperAdmin() || canHoldTask())
                               ) {
                                 <button
                                   type="button"
@@ -616,6 +607,8 @@
                                 >
                                   Network
                                 </button>
+                              }
+                              @if (camera.status !== 'online') {
                                 <button
                                   type="button"
                                   class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -639,18 +632,61 @@
                             }
                           </div>
                         }
+                        @if (!isSuperAdmin() && canHoldTask()) {
+                          <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                            @if (camera.status !== 'online') {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  isCameraStatus(camera, 'hold')
+                                    ? 'border-amber-500 bg-amber-500 text-white shadow-lg shadow-amber-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover-border-amber-300 hover:text-amber-600'
+                                "
+                                (click)="toggleCameraStatus(camera, 'hold')"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Hold
+                              </button>
+                            }
+                            @if (
+                              camera.status !== 'maintenance' &&
+                              camera.status !== 'maintenance_hold' &&
+                              camera.status !== 'maintenance_long_time'
+                            ) {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  isCameraStatus(camera, 'network')
+                                    ? 'border-sky-500 bg-sky-500 text-white shadow-lg shadow-sky-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:border-sky-300 hover:text-sky-600'
+                                "
+                                (click)="toggleCameraStatus(camera, 'network')"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Network
+                              </button>
+                            }
+                            @if (isCameraStatusUpdating(camera.id)) {
+                              <span class="inline-flex h-2.5 w-2.5 animate-spin rounded-full border border-slate-300 border-t-indigo-500"></span>
+                            }
+                          </div>
+                        }
 
                         <div class="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            class="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-100"
-                            (click)="openTaskModal(camera)"
-                          >
-                            <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
-                              <path d="M10.5 4a.5.5 0 10-1 0v5.5H4a.5.5 0 000 1h5.5V16a.5.5 0 001 0v-5.5H16a.5.5 0 000-1h-5.5V4z" />
-                            </svg>
-                            Create task
-                          </button>
+                          @if (canCreateTask()) {
+                            <button
+                              type="button"
+                              class="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-100"
+                              (click)="openTaskModal(camera)"
+                            >
+                              <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                                <path d="M10.5 4a.5.5 0 10-1 0v5.5H4a.5.5 0 000 1h5.5V16a.5.5 0 001 0v-5.5H16a.5.5 0 000-1h-5.5V4z" />
+                              </svg>
+                              Create task
+                            </button>
+                          }
                           @if (isSuperAdmin()) {
                             <!-- Edit button removed from card footer as requested -->
                           }
@@ -793,7 +829,7 @@
                             >
                               Active
                             </button>
-                            @if (camera.status !== 'online') {
+                            @if (camera.status !== 'online' && (isSuperAdmin() || canHoldTask())) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -807,6 +843,8 @@
                               >
                                 Hold
                               </button>
+                            }
+                            @if (camera.status !== 'maintenance' && camera.status !== 'maintenance_hold' && camera.status !== 'maintenance_long_time' && (isSuperAdmin() || canHoldTask())) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -820,6 +858,8 @@
                               >
                                 Network
                               </button>
+                            }
+                            @if (camera.status !== 'online') {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -842,17 +882,60 @@
                             }
                           </div>
                         }
-            <div class="flex flex-wrap gap-2">
-              <button
-                type="button"
-                class="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-100"
-                (click)="openTaskModal(camera)"
-              >
-                <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
-                  <path d="M10.5 4a.5.5 0 10-1 0v5.5H4a.5.5 0 000 1h5.5V16a.5.5 0 001 0v-5.5H16a.5.5 0 000-1h-5.5V4z" />
-                </svg>
-                Create task
-              </button>
+                        @if (!isSuperAdmin() && canHoldTask()) {
+                          <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                            @if (camera.status !== 'online') {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  isCameraStatus(camera, 'hold')
+                                    ? 'border-amber-500 bg-amber-500 text-white shadow-lg shadow-amber-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover-border-amber-300 hover:text-amber-600'
+                                "
+                                (click)="toggleCameraStatus(camera, 'hold')"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Hold
+                              </button>
+                            }
+                            @if (
+                              camera.status !== 'maintenance' &&
+                              camera.status !== 'maintenance_hold' &&
+                              camera.status !== 'maintenance_long_time'
+                            ) {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  isCameraStatus(camera, 'network')
+                                    ? 'border-sky-500 bg-sky-500 text-white shadow-lg shadow-sky-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:border-sky-300 hover:text-sky-600'
+                                "
+                                (click)="toggleCameraStatus(camera, 'network')"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Network
+                              </button>
+                            }
+                            @if (isCameraStatusUpdating(camera.id)) {
+                              <span class="inline-flex h-2.5 w-2.5 animate-spin rounded-full border border-slate-300 border-t-indigo-500"></span>
+                            }
+                          </div>
+                        }
+                        <div class="flex flex-wrap gap-2">
+                          @if (canCreateTask()) {
+                            <button
+                              type="button"
+                              class="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-100"
+                              (click)="openTaskModal(camera)"
+                            >
+                              <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                                <path d="M10.5 4a.5.5 0 10-1 0v5.5H4a.5.5 0 000 1h5.5V16a.5.5 0 001 0v-5.5H16a.5.5 0 000-1h-5.5V4z" />
+                              </svg>
+                              Create task
+                            </button>
+                          }
               @if (isSuperAdmin()) {
                 <button
                   type="button"

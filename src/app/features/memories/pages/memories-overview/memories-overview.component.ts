@@ -441,7 +441,17 @@ export class MemoriesOverviewComponent implements OnInit {
         }),
       )
       .subscribe((developers) => {
-        const sorted = [...developers].sort((a, b) => a.developerName.localeCompare(b.developerName));
+        // Filter developers based on user's accessibleDevelopers
+        let filteredDevelopers = developers;
+        const user = this.authStore.user();
+        const isSuperAdmin = user?.role === 'Super Admin';
+        if (user && !isSuperAdmin) {
+          const accessible = user.accessibleDevelopers ?? [];
+          if (accessible.length > 0 && accessible[0] !== 'all') {
+            filteredDevelopers = developers.filter((dev) => accessible.includes(dev._id));
+          }
+        }
+        const sorted = [...filteredDevelopers].sort((a, b) => a.developerName.localeCompare(b.developerName));
         this.developers.set(sorted);
       });
 

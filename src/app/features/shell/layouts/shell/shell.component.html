@@ -9,7 +9,7 @@
     </div>
 
     <nav class="mt-10 space-y-1">
-      @for (item of navItems; track item.path) {
+      @for (item of navItems(); track item.path) {
         <a
           [routerLink]="item.path"
           routerLinkActive="bg-slate-900 text-white shadow-lg shadow-slate-900/20"
@@ -123,7 +123,7 @@
       </div>
 
       <nav class="mt-10 space-y-2">
-        @for (item of navItems; track item.path) {
+        @for (item of navItems(); track item.path) {
           <a
             [routerLink]="item.path"
             (click)="closeSidebar()"

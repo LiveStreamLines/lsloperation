@@ -60,7 +60,7 @@ export class LoginComponent {
           const returnUrl = this.router.parseUrl(
             this.router.routerState.snapshot.root.queryParamMap.get(
               'returnUrl',
-            ) ?? '/dashboard',
+            ) ?? '/camera-monitor',
           );
           this.router.navigateByUrl(returnUrl);
         },

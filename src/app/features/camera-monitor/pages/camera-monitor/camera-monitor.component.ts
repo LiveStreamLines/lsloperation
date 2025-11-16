@@ -171,6 +171,21 @@ export class CameraMonitorComponent implements OnInit {
   readonly users = signal<User[]>([]);
   readonly cameraRecords = signal<CameraViewModel[]>([]);
 
+  // Filtered projects based on selected developer
+  readonly filteredProjects = computed(() => {
+    const allProjects = this.projects();
+    const developerId = this.selectedDeveloperId();
+    
+    if (!developerId) {
+      return allProjects;
+    }
+    
+    return allProjects.filter((project) => {
+      const projectDeveloperId = this.extractId(project.developer);
+      return projectDeveloperId === developerId;
+    });
+  });
+
   readonly selectedDeveloperId = signal<string | null>(null);
   readonly selectedProjectId = signal<string | null>(null);
   readonly selectedCountry = signal<string | null>(null);
@@ -204,7 +219,7 @@ export class CameraMonitorComponent implements OnInit {
 
   readonly cameraStatusOptions: Array<{ value: CameraStatusFilter; label: string }> = [
     { value: 'all', label: 'All statuses' },
-    { value: 'online', label: 'Online' },
+    { value: 'online', label: '100% health' },
     { value: 'offline', label: 'Offline' },
     { value: 'offline_hold', label: 'Offline / hold' },
     { value: 'offline_network', label: 'Offline / network' },
@@ -240,6 +255,13 @@ export class CameraMonitorComponent implements OnInit {
 
   readonly isSuperAdmin = computed(() => this.authStore.user()?.role === 'Super Admin');
   readonly currentUserName = computed(() => this.authStore.user()?.name ?? 'System');
+  readonly currentUser = computed(() => this.authStore.user());
+  
+  // Permission checks
+  readonly canCreateTask = computed(() => (this.currentUser() as any)?.canCreateMonitorTask ?? false);
+  readonly canHoldTask = computed(() => (this.currentUser() as any)?.canHoldMaintenance ?? false);
+  readonly canDeletePhoto = computed(() => (this.currentUser() as any)?.canDeletePhoto ?? false);
+  readonly accessibleDevelopers = computed(() => this.currentUser()?.accessibleDevelopers ?? []);
 
   readonly filteredCameras = computed<CameraViewModel[]>(() => {
     const cameras = this.cameraRecords();
@@ -249,8 +271,15 @@ export class CameraMonitorComponent implements OnInit {
     const statusFilter = this.selectedCameraStatus();
     const search = this.searchTerm().trim().toLowerCase();
     const sort = this.sortMode();
+    const isSuperAdmin = this.isSuperAdmin();
+    const accessible = this.accessibleDevelopers();
 
     let list = cameras;
+
+    // Filter by accessibleDevelopers if not Super Admin
+    if (!isSuperAdmin && accessible.length > 0 && accessible[0] !== 'all') {
+      list = list.filter((camera) => accessible.includes(camera.developerId));
+    }
 
     if (developerId) {
       list = list.filter((camera) => camera.developerId === developerId);
@@ -602,7 +631,7 @@ export class CameraMonitorComponent implements OnInit {
   cameraStatusLabel(status: CameraStatus): string {
     switch (status) {
       case 'online':
-        return 'Online';
+        return '100% health';
       case 'offline':
         return 'Offline';
       case 'offline_hold':
@@ -1150,11 +1179,26 @@ export class CameraMonitorComponent implements OnInit {
         }),
       )
       .subscribe(([developers, projects, cameras, lastPictures]) => {
-        this.developers.set(this.sortByName(developers, (item) => item.developerName));
+        // Filter developers based on user's accessibleDevelopers
+        let filteredDevelopers = developers;
+        let filteredCameras = cameras;
+        const user = this.currentUser();
+        if (user && !this.isSuperAdmin()) {
+          const accessible = this.accessibleDevelopers();
+          if (accessible.length > 0 && accessible[0] !== 'all') {
+            filteredDevelopers = developers.filter((dev) => accessible.includes(dev._id));
+            // Filter cameras to only show those from accessible developers
+            filteredCameras = cameras.filter((camera) => {
+              const developerId = this.extractId(camera.developer);
+              return developerId && accessible.includes(developerId);
+            });
+          }
+        }
+        this.developers.set(this.sortByName(filteredDevelopers, (item) => item.developerName));
         this.projects.set(this.sortByName(projects, (item) => item.projectName));
 
         // Build initial camera records and show them immediately (no health/maintenance data yet)
-        const initialRecords = this.buildCameraRecords(cameras, developers, projects, lastPictures);
+        const initialRecords = this.buildCameraRecords(filteredCameras, filteredDevelopers, projects, lastPictures);
         this.cameraRecords.set(initialRecords);
 
         // Fetch health data (for all cameras with valid tags) and maintenance summaries in the background
@@ -1165,10 +1209,24 @@ export class CameraMonitorComponent implements OnInit {
           .pipe(takeUntilDestroyed(this.destroyRef))
           .subscribe(({ health, maintenance }) => {
             this.cameraHealthData.set(health);
+            // Use filtered cameras and developers for the final build
+            const user = this.currentUser();
+            let finalCameras = cameras;
+            let finalDevelopers = developers;
+            if (user && !this.isSuperAdmin()) {
+              const accessible = this.accessibleDevelopers();
+              if (accessible.length > 0 && accessible[0] !== 'all') {
+                finalDevelopers = developers.filter((dev) => accessible.includes(dev._id));
+                finalCameras = cameras.filter((camera) => {
+                  const developerId = this.extractId(camera.developer);
+                  return developerId && accessible.includes(developerId);
+                });
+              }
+            }
             this.cameraRecords.set(
               this.buildCameraRecords(
-                cameras,
-                developers,
+                finalCameras,
+                finalDevelopers,
                 projects,
                 lastPictures,
                 health,

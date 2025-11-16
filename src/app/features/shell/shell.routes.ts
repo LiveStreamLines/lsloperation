@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from '@core/auth/auth.guard';
+import { authGuard, cameraMonitorGuard } from '@core/auth/auth.guard';
 import { ShellComponent } from '@features/shell/layouts/shell/shell.component';
 
 const routes: Routes = [
@@ -11,7 +11,7 @@ const routes: Routes = [
       {
         path: '',
         pathMatch: 'full',
-        redirectTo: 'camera-monitor',
+        redirectTo: 'maintenance', // Default to maintenance, camera-monitor guard will handle redirect if needed
       },
       {
         path: 'dashboard',
@@ -78,6 +78,7 @@ const routes: Routes = [
       },
       {
         path: 'camera-monitor',
+        canActivate: [cameraMonitorGuard],
         loadComponent: () =>
           import('@features/camera-monitor/pages/camera-monitor/camera-monitor.component').then(
             (m) => m.CameraMonitorComponent,
