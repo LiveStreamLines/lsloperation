@@ -202,7 +202,7 @@ export class MaintenanceOverviewComponent implements OnInit {
   readonly selectedCameraId = signal<string | null>(null);
   readonly selectedUserId = signal<string | null>(null);
   readonly selectedTaskType = signal<string | null>(null);
-  readonly selectedStatus = signal<MaintenanceStatus | null>('pending');
+  readonly selectedStatus = signal<MaintenanceStatus | 'all' | null>('pending');
 
   readonly editTaskModal = signal<UiMaintenance | null>(null);
   readonly editTaskForm = signal<EditTaskFormState>({
@@ -464,8 +464,8 @@ export class MaintenanceOverviewComponent implements OnInit {
           if (userId) {
             return task.assignedUsers.some((user) => user.id === userId);
           }
-          // Super Admin: apply status filter
-          if (status && task.status !== status) {
+          // Super Admin: apply status filter (only if status is not 'all')
+          if (status && status !== 'all' && task.status !== status) {
             return false;
           }
           return true; // Super Admin sees all tasks
@@ -483,21 +483,20 @@ export class MaintenanceOverviewComponent implements OnInit {
           // Convert both to strings for comparison to handle any type mismatches
           const isCreatedByUser = createdBy && String(createdBy) === String(currentUserId);
           
-          // If user created the task, show it in all statuses (regardless of permission flag)
-          // This ensures users can always see tasks they created
-          if (isCreatedByUser) {
-            return true; // Show tasks created by user regardless of status filter
+          // Check if task is visible to user (assigned or created by them)
+          const isVisible = isAssigned || isCreatedByUser;
+          
+          if (!isVisible) {
+            return false;
           }
           
-          // For assigned tasks (not created by user), apply status filter
-          if (isAssigned) {
-            if (status && task.status !== status) {
-              return false;
-            }
-            return true;
+          // Apply status filter to all visible tasks (both assigned and created)
+          // Only skip filter if status is 'all' or not set
+          if (status && status !== 'all' && task.status !== status) {
+            return false;
           }
           
-          return false;
+          return true;
         }
 
         return false; // If no currentUserId, don't show any tasks

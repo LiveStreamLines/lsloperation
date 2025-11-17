@@ -32,8 +32,11 @@ export const cameraMonitorGuard: CanActivateFn = () => {
     return router.createUrlTree(['/auth/login']);
   }
 
-  // If user doesn't have camera monitor access, redirect to maintenance
-  if (!(user as any).hasCameraMonitorAccess) {
+  // Super Admin has full access to everything
+  const isSuperAdmin = user.role === 'Super Admin';
+  
+  // If user doesn't have camera monitor access and is not Super Admin, redirect to maintenance
+  if (!isSuperAdmin && !(user as any).hasCameraMonitorAccess) {
     return router.createUrlTree(['/maintenance']);
   }
 
