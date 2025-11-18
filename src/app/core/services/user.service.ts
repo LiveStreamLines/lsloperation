@@ -47,7 +47,7 @@ export class UserService {
     return this.getAll().pipe(map((users) => users.find((user) => user._id === id)));
   }
 
-  create(payload: Partial<User>): Observable<User> {
+  create(payload: FormData): Observable<User> {
     return this.http.post<User>(this.baseUrl, payload).pipe(
       tap(() => {
         this.clearCache();
@@ -55,7 +55,7 @@ export class UserService {
     );
   }
 
-  update(userId: string, payload: Partial<User>): Observable<User> {
+  update(userId: string, payload: FormData): Observable<User> {
     return this.http.put<User>(`${this.baseUrl}/${userId}`, payload).pipe(
       tap(() => {
         this.clearCache();

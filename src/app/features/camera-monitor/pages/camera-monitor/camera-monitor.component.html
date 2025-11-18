@@ -128,7 +128,7 @@
             selectedCameraStatus() === 'offline_hold' ||
             selectedCameraStatus() === 'offline_network'
           ) {
-            <div class="flex flex-wrap items-center gap-2 pl-1">
+            <div class="mt-1 flex flex-wrap items-center gap-2 pl-1">
               <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                 Offline:
               </span>
@@ -1054,24 +1054,38 @@
               ></textarea>
             </label>
 
-            <div class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2">
-              <span class="font-semibold text-slate-800">Assign engineers</span>
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+              <span class="font-semibold text-slate-800">Assigned to <span class="text-rose-500">*</span></span>
+              <select
+                class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                [value]="taskForm().assignedUser ?? ''"
+                (change)="onTaskAssignedUserChange($any($event.target).value)"
+              >
+                <option value="">Select engineer...</option>
+                @for (user of users(); track user._id) {
+                  <option [value]="user._id">{{ user.name }} ({{ user.role }})</option>
+                }
+              </select>
+            </label>
+
+            <div class="flex flex-col gap-2 text-sm text-slate-600">
+              <span class="font-semibold text-slate-800">Assistant</span>
               <div class="relative multi-select-dropdown">
                 <button
                   type="button"
                   class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-left text-sm shadow-sm transition hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  (click)="toggleTaskAssignedUsersDropdown()"
+                  (click)="toggleTaskAssistantsDropdown()"
                 >
                   <span class="text-slate-600">
-                    @if (taskForm().assignedUsers.length === 0) {
-                      Select engineers...
+                    @if (taskForm().assistants.length === 0) {
+                      Select assistants...
                     } @else {
-                      {{ taskForm().assignedUsers.length }} selected
+                      {{ taskForm().assistants.length }} selected
                     }
                   </span>
                   <svg
                     class="h-5 w-5 text-slate-400 transition-transform"
-                    [class.rotate-180]="isTaskAssignedUsersDropdownOpen()"
+                    [class.rotate-180]="isTaskAssistantsDropdownOpen()"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -1079,7 +1093,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                @if (isTaskAssignedUsersDropdownOpen()) {
+                @if (isTaskAssistantsDropdownOpen()) {
                   <div
                     class="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-2xl border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
                   >
@@ -1087,12 +1101,12 @@
                       @for (user of users(); track user._id) {
                         <label
                           class="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition hover:bg-slate-50"
-                          (click)="toggleTaskAssignedUserSelection(user._id)"
+                          (click)="toggleTaskAssistantSelection(user._id)"
                         >
                           <input
                             type="checkbox"
                             class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
-                            [checked]="isTaskAssignedUserSelected(user._id)"
+                            [checked]="isTaskAssistantSelected(user._id)"
                             (change)="$event.stopPropagation()"
                           />
                           <span class="text-slate-700">{{ user.name }} ({{ user.role }})</span>
@@ -1102,9 +1116,9 @@
                   </div>
                 }
               </div>
-              @if (taskForm().assignedUsers.length > 0) {
+              @if (taskForm().assistants.length > 0) {
                 <div class="flex flex-wrap gap-2">
-                  @for (userId of taskForm().assignedUsers; track userId) {
+                  @for (userId of taskForm().assistants; track userId) {
                     <span
                       class="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700"
                     >
@@ -1112,7 +1126,7 @@
                       <button
                         type="button"
                         class="rounded-full hover:bg-indigo-200"
-                        (click)="removeTaskAssignedUser(userId)"
+                        (click)="removeTaskAssistant(userId)"
                       >
                         <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
                           <path
@@ -1123,6 +1137,43 @@
                         </svg>
                       </button>
                     </span>
+                  }
+                </div>
+              }
+            </div>
+
+            <div class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2">
+              <span class="font-semibold text-slate-800">Attachments</span>
+              <input
+                type="file"
+                multiple
+                accept="*/*"
+                class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                (change)="onTaskAttachmentsChange($event)"
+              />
+              <p class="text-xs text-slate-500">You can attach up to 10 files (max 10MB each)</p>
+              @if (taskForm().attachments.length > 0) {
+                <div class="mt-2 space-y-2">
+                  @for (file of taskForm().attachments; track $index) {
+                    <div class="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <div class="flex-1 min-w-0">
+                        <p class="text-xs font-semibold text-slate-700 truncate">{{ file.name }}</p>
+                        <p class="text-xs text-slate-500">{{ formatFileSize(file.size) }}</p>
+                      </div>
+                      <button
+                        type="button"
+                        class="ml-2 rounded-full p-1 text-rose-600 transition hover:bg-rose-100"
+                        (click)="removeTaskAttachment($index)"
+                      >
+                        <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fill-rule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    </div>
                   }
                 </div>
               }

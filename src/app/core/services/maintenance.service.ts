@@ -28,7 +28,7 @@ export class MaintenanceService {
     return this.http.get<Maintenance[]>(`${this.baseUrl}/camera/${cameraId}`);
   }
 
-  create(payload: MaintenanceCreateRequest): Observable<Maintenance> {
+  create(payload: MaintenanceCreateRequest | FormData): Observable<Maintenance> {
     return this.http.post<Maintenance>(this.baseUrl, payload);
   }
 

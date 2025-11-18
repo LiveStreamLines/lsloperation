@@ -85,7 +85,10 @@ export class CameraHistoryComponent implements OnInit {
   readonly toast = signal<{ message: string; tone: 'success' | 'error' } | null>(null);
   readonly selectedImageUrl = signal<string | null>(null);
 
-  readonly canDeletePhoto = computed(() => (this.authStore.user() as any)?.canDeletePhoto ?? false);
+  readonly isSuperAdmin = computed(() => this.authStore.user()?.role === 'Super Admin');
+  readonly canDeletePhoto = computed(
+    () => this.isSuperAdmin() || ((this.authStore.user() as any)?.canDeletePhoto ?? false),
+  );
 
   readonly hasHistory = computed(() => {
     const data = this.history();

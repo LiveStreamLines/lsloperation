@@ -103,7 +103,9 @@ interface FilterOption {
 interface TaskFormState {
   taskType: string;
   taskDescription: string;
-  assignedUsers: string[];
+  assignedUser: string | null; // Single user - "Assigned to"
+  assistants: string[]; // Multiple users - "Assistant"
+  attachments: File[]; // File attachments
   isSaving: boolean;
   error: string | null;
 }
@@ -201,7 +203,9 @@ export class CameraMonitorComponent implements OnInit {
   readonly taskForm = signal<TaskFormState>({
     taskType: '',
     taskDescription: '',
-    assignedUsers: [],
+    assignedUser: null,
+    assistants: [],
+    attachments: [],
     isSaving: false,
     error: null,
   });
@@ -258,9 +262,15 @@ export class CameraMonitorComponent implements OnInit {
   readonly currentUser = computed(() => this.authStore.user());
   
   // Permission checks
-  readonly canCreateTask = computed(() => (this.currentUser() as any)?.canCreateMonitorTask ?? false);
-  readonly canHoldTask = computed(() => (this.currentUser() as any)?.canHoldMaintenance ?? false);
-  readonly canDeletePhoto = computed(() => (this.currentUser() as any)?.canDeletePhoto ?? false);
+  readonly canCreateTask = computed(
+    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canCreateMonitorTask ?? false),
+  );
+  readonly canHoldTask = computed(
+    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canHoldMaintenance ?? false),
+  );
+  readonly canDeletePhoto = computed(
+    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canDeletePhoto ?? false),
+  );
   readonly accessibleDevelopers = computed(() => this.currentUser()?.accessibleDevelopers ?? []);
 
   readonly filteredCameras = computed<CameraViewModel[]>(() => {
@@ -793,7 +803,9 @@ export class CameraMonitorComponent implements OnInit {
     this.taskForm.set({
       taskType: '',
       taskDescription: '',
-      assignedUsers: [],
+      assignedUser: null,
+      assistants: [],
+      attachments: [],
       isSaving: false,
       error: null,
     });
@@ -811,30 +823,23 @@ export class CameraMonitorComponent implements OnInit {
     }));
   }
 
-  onTaskAssignedUsersChange(event: Event): void {
-    const target = event.target as HTMLSelectElement | null;
-    if (!target) {
-      return;
-    }
-
-    const assignedUsers = Array.from(target.selectedOptions).map((option) => option.value);
-
+  onTaskAssignedUserChange(userId: string): void {
     this.taskForm.update((state) => ({
       ...state,
-      assignedUsers,
+      assignedUser: userId || null,
       error: null,
     }));
   }
 
-  // Multi-select dropdown state for create task assigned users
-  readonly isTaskAssignedUsersDropdownOpen = signal(false);
+  // Multi-select dropdown state for assistants
+  readonly isTaskAssistantsDropdownOpen = signal(false);
 
-  toggleTaskAssignedUsersDropdown(): void {
-    this.isTaskAssignedUsersDropdownOpen.update((v) => !v);
+  toggleTaskAssistantsDropdown(): void {
+    this.isTaskAssistantsDropdownOpen.update((v) => !v);
   }
 
-  toggleTaskAssignedUserSelection(userId: string): void {
-    const current = this.taskForm().assignedUsers;
+  toggleTaskAssistantSelection(userId: string): void {
+    const current = this.taskForm().assistants;
     let newSelection: string[];
 
     if (current.includes(userId)) {
@@ -845,24 +850,24 @@ export class CameraMonitorComponent implements OnInit {
 
     this.taskForm.update((state) => ({
       ...state,
-      assignedUsers: newSelection,
+      assistants: newSelection,
       error: null,
     }));
   }
 
-  removeTaskAssignedUser(userId: string): void {
-    const current = this.taskForm().assignedUsers;
+  removeTaskAssistant(userId: string): void {
+    const current = this.taskForm().assistants;
     const newSelection = current.filter((id) => id !== userId);
 
     this.taskForm.update((state) => ({
       ...state,
-      assignedUsers: newSelection,
+      assistants: newSelection,
       error: null,
     }));
   }
 
-  isTaskAssignedUserSelected(userId: string): boolean {
-    return this.taskForm().assignedUsers.includes(userId);
+  isTaskAssistantSelected(userId: string): boolean {
+    return this.taskForm().assistants.includes(userId);
   }
 
   getTaskAssignedUserLabel(userId: string): string {
@@ -877,10 +882,10 @@ export class CameraMonitorComponent implements OnInit {
     }
 
     const form = this.taskForm();
-    if (!form.taskType.trim() || !form.taskDescription.trim() || form.assignedUsers.length === 0) {
+    if (!form.taskType.trim() || !form.taskDescription.trim() || !form.assignedUser) {
       this.taskForm.update((state) => ({
         ...state,
-        error: 'Task type, description, and at least one engineer are required.',
+        error: 'Task type, description, and assigned engineer are required.',
       }));
       return;
     }
@@ -888,19 +893,54 @@ export class CameraMonitorComponent implements OnInit {
     const currentUser = this.authStore.user();
     // Get user ID - try both 'id' and '_id' fields to handle different data formats
     const userId = currentUser?.id || (currentUser as any)?.['_id'] || (currentUser as any)?._id;
-    const payload: MaintenanceCreateRequest = {
-      taskType: form.taskType.trim(),
-      taskDescription: form.taskDescription.trim(),
-      assignedUsers: [...form.assignedUsers],
-      status: 'pending',
-      cameraId: camera.id,
-      developerId: camera.developerId,
-      projectId: camera.projectId,
-      dateOfRequest: new Date().toISOString(),
-      userComment: '',
-      addedUserId: userId as string | undefined,
-      addedUserName: currentUser?.name,
-    } as any;
+    
+    // Build FormData if there are attachments, otherwise use JSON payload
+    const hasAttachments = form.attachments && form.attachments.length > 0;
+    let payload: MaintenanceCreateRequest | FormData;
+    
+    if (hasAttachments) {
+      const formData = new FormData();
+      formData.append('taskType', form.taskType.trim());
+      formData.append('taskDescription', form.taskDescription.trim());
+      formData.append('assignedUser', form.assignedUser || '');
+      if (form.assistants.length > 0) {
+        formData.append('assistants', JSON.stringify(form.assistants));
+      }
+      formData.append('status', 'pending');
+      formData.append('cameraId', camera.id);
+      formData.append('developerId', camera.developerId);
+      formData.append('projectId', camera.projectId);
+      formData.append('dateOfRequest', new Date().toISOString());
+      formData.append('userComment', '');
+      if (userId) {
+        formData.append('addedUserId', userId);
+      }
+      if (currentUser?.name) {
+        formData.append('addedUserName', currentUser.name);
+      }
+      
+      // Append attachments
+      for (const file of form.attachments) {
+        formData.append('attachments', file);
+      }
+      
+      payload = formData;
+    } else {
+      payload = {
+        taskType: form.taskType.trim(),
+        taskDescription: form.taskDescription.trim(),
+        assignedUser: form.assignedUser,
+        assistants: form.assistants.length > 0 ? [...form.assistants] : undefined,
+        status: 'pending',
+        cameraId: camera.id,
+        developerId: camera.developerId,
+        projectId: camera.projectId,
+        dateOfRequest: new Date().toISOString(),
+        userComment: '',
+        addedUserId: userId as string | undefined,
+        addedUserName: currentUser?.name,
+      } as any;
+    }
 
     this.taskForm.update((state) => ({ ...state, isSaving: true, error: null }));
 
@@ -925,6 +965,34 @@ export class CameraMonitorComponent implements OnInit {
         this.showToast('Maintenance task created successfully.', 'success');
         this.closeTaskModal();
       });
+  }
+
+  onTaskAttachmentsChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const files = Array.from(input.files);
+      this.taskForm.update((state) => ({
+        ...state,
+        attachments: [...state.attachments, ...files],
+      }));
+      // Reset input to allow selecting the same file again
+      input.value = '';
+    }
+  }
+
+  removeTaskAttachment(index: number): void {
+    this.taskForm.update((state) => ({
+      ...state,
+      attachments: state.attachments.filter((_, i) => i !== index),
+    }));
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   }
 
   openProjectInfo(projectId: string): void {
@@ -1771,20 +1839,15 @@ export class CameraMonitorComponent implements OnInit {
       return true;
     }
 
-    // Grouped offline filter: includes offline + its sub-statuses
+    // Offline "all" filter: only shows cameras with status 'offline', not hold/network variants
     if (status === 'offline') {
-      return (
-        camera.status === 'offline' ||
-        camera.status === 'offline_hold' ||
-        camera.status === 'offline_network'
-      );
+      return camera.status === 'offline';
     }
 
-    // Grouped maintenance "all" filter: includes all maintenance variants
+    // Maintenance "all" filter: shows all maintenance statuses except 'maintenance_hold'
     if (status === 'maintenance') {
       return (
         camera.status === 'maintenance' ||
-        camera.status === 'maintenance_hold' ||
         camera.status === 'maintenance_long_time'
       );
     }
@@ -1826,7 +1889,7 @@ export class CameraMonitorComponent implements OnInit {
       !target.closest('.multi-select-dropdown') &&
       !target.closest('button[type="button"]')
     ) {
-      this.isTaskAssignedUsersDropdownOpen.set(false);
+      this.isTaskAssistantsDropdownOpen.set(false);
     }
   }
 }

@@ -11,6 +11,8 @@ export interface AuthenticatedUser {
   email: string;
   name: string;
   role: UserRole;
+  image?: string; // User profile image/avatar URL (legacy/alias)
+  logo?: string; // User profile image/avatar path (backend field: logos/user/filename)
   accessibleDevelopers: string[];
   accessibleProjects: string[];
   accessibleCameras: string[];

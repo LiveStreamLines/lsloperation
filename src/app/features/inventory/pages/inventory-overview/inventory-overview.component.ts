@@ -156,10 +156,18 @@ export class InventoryOverviewComponent implements OnInit {
   readonly accessibleDevelopers = computed(() => this.currentUser()?.accessibleDevelopers ?? []);
   
   // Permission checks
-  readonly canAddDeviceType = computed(() => (this.currentUser() as any)?.canAddDeviceType ?? false);
-  readonly canAddDeviceStock = computed(() => (this.currentUser() as any)?.canAddDeviceStock ?? false);
-  readonly canAssignUnassignUser = computed(() => (this.currentUser() as any)?.canAssignUnassignUser ?? false);
-  readonly canAssignUnassignProject = computed(() => (this.currentUser() as any)?.canAssignUnassignProject ?? false);
+  readonly canAddDeviceType = computed(
+    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canAddDeviceType ?? false),
+  );
+  readonly canAddDeviceStock = computed(
+    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canAddDeviceStock ?? false),
+  );
+  readonly canAssignUnassignUser = computed(
+    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canAssignUnassignUser ?? false),
+  );
+  readonly canAssignUnassignProject = computed(
+    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canAssignUnassignProject ?? false),
+  );
 
   readonly developerMap = computed(() => new Map(this.developers().map((developer) => [developer._id, developer])));
   readonly projectMap = computed(() => new Map(this.allProjects().map((project) => [project._id, project])));

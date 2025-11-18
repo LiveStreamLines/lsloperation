@@ -18,6 +18,7 @@ import {
   DEFAULT_MAINTENANCE_STATUS_ORDER,
   LEGACY_TASK_TYPES,
   Maintenance,
+  MaintenanceAttachment,
   MaintenanceStatus,
   MaintenanceUpdateRequest,
 } from '@core/models/maintenance.model';
@@ -38,6 +39,7 @@ import {
   InventoryItem,
   InventoryUserAssignmentPayload,
 } from '@core/models/inventory.model';
+import { environment } from '@env';
 
 interface MaintenanceMetricCard {
   title: string;
@@ -55,6 +57,8 @@ interface AssignedUserInfo {
   id: string;
   name: string;
   role?: string;
+  image?: string; // User profile image/avatar URL (legacy/alias)
+  logo?: string; // User profile image/avatar path (backend field: logos/user/filename)
 }
 
 interface UiMaintenance {
@@ -67,13 +71,16 @@ interface UiMaintenance {
   projectName: string;
   cameraId?: string;
   cameraName: string;
-  assignedUsers: AssignedUserInfo[];
+  assignedUser?: AssignedUserInfo; // Single user - "Assigned to"
+  assistants: AssignedUserInfo[]; // Multiple users - "Assistant"
+  assignedBy?: AssignedUserInfo;
   status: MaintenanceStatus;
   dateOfRequest?: string;
   createdDate?: string;
   startTime?: string;
   completionTime?: string;
   userComment?: string;
+  attachments?: MaintenanceAttachment[];
   isOverdue: boolean;
   durationMinutes?: number | null;
   raw: Maintenance;
@@ -130,7 +137,8 @@ interface CompletionActionReleaseFlags {
 interface EditTaskFormState {
   taskType: string;
   taskDescription: string;
-  assignedUsers: string[];
+  assignedUser: string | null; // Single user - "Assigned to"
+  assistants: string[]; // Multiple users - "Assistant"
   status: MaintenanceStatus;
   isSaving: boolean;
   error: string | null;
@@ -203,12 +211,14 @@ export class MaintenanceOverviewComponent implements OnInit {
   readonly selectedUserId = signal<string | null>(null);
   readonly selectedTaskType = signal<string | null>(null);
   readonly selectedStatus = signal<MaintenanceStatus | 'all' | null>('pending');
+  readonly selectedTaskAssignment = signal<'all' | 'assigned-to-me' | 'assigned-by-me' | null>('all');
 
   readonly editTaskModal = signal<UiMaintenance | null>(null);
   readonly editTaskForm = signal<EditTaskFormState>({
     taskType: '',
     taskDescription: '',
-    assignedUsers: [],
+    assignedUser: null,
+    assistants: [],
     status: 'pending',
     isSaving: false,
     error: null,
@@ -348,7 +358,13 @@ export class MaintenanceOverviewComponent implements OnInit {
   });
   readonly currentUserName = computed(() => this.authStore.user()?.name ?? 'System');
   readonly isSuperAdmin = computed(() => this.authStore.user()?.role === 'Super Admin');
-  readonly canCreateTask = computed(() => (this.authStore.user() as any)?.canCreateMonitorTask ?? false);
+  readonly canSeeAllTasks = computed(() => {
+    const user = this.authStore.user();
+    return this.isSuperAdmin() || (user as any)?.canSeeAllTasks === true;
+  });
+  readonly canCreateTask = computed(
+    () => this.isSuperAdmin() || ((this.authStore.user() as any)?.canCreateMonitorTask ?? false),
+  );
 
   private readonly baseStatusOptions: FilterOption[] = [
     { value: 'all', label: 'All statuses' },
@@ -362,13 +378,9 @@ export class MaintenanceOverviewComponent implements OnInit {
   ];
 
   readonly statusOptions = computed<FilterOption[]>(() => {
-    if (this.isSuperAdmin()) {
-      return this.baseStatusOptions;
-    }
-
-    return this.baseStatusOptions.filter(
-      (option) => option.value === 'all' || option.value === 'pending' || option.value === 'in-progress',
-    );
+    // All users (including non-super admin without canSeeAllTasks) can see all status filter pills
+    // The task filtering logic will handle showing only their own tasks for users without permission
+    return this.baseStatusOptions;
   });
 
   readonly taskTypeOptions = computed<FilterOption[]>(() => {
@@ -418,6 +430,7 @@ export class MaintenanceOverviewComponent implements OnInit {
 
   readonly assignedUserOptions = computed<FilterOption[]>(() =>
     [...this.users()]
+      .filter((user) => user.role === 'Admin' || user.role === 'Super Admin')
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((user) => ({
         value: user._id,
@@ -442,8 +455,10 @@ export class MaintenanceOverviewComponent implements OnInit {
     const userId = this.selectedUserId();
     const taskType = this.selectedTaskType();
     const status = this.selectedStatus();
+    const taskAssignment = this.selectedTaskAssignment();
     const isSuperAdmin = this.isSuperAdmin();
     const currentUserId = this.currentUserId();
+    const hasSeeAllTasksPermission = this.canSeeAllTasks();
 
     return this.normalizedTasks()
       .filter((task) => {
@@ -460,46 +475,73 @@ export class MaintenanceOverviewComponent implements OnInit {
           return false;
         }
 
-        if (isSuperAdmin) {
+        // Check if task is assigned to current user (check assignedUser or assistants)
+        const isAssignedToMe = currentUserId && (
+          (task.assignedUser && String(task.assignedUser.id) === String(currentUserId)) ||
+          task.assistants.some((user) => {
+            const userId = user.id;
+            return userId && String(userId) === String(currentUserId);
+          })
+        );
+
+        // Check if task was created by current user
+        const rawTask = task.raw;
+        const createdBy = (rawTask as any).addedUserId || 
+                         (rawTask as any).createdBy || 
+                         (rawTask as any).createdById ||
+                         (rawTask as any).addedBy;
+        const isAssignedByMe = currentUserId && createdBy && String(createdBy) === String(currentUserId);
+
+        // Super Admin or users with "See all tasks" permission: see all tasks
+        if (isSuperAdmin || hasSeeAllTasksPermission) {
           if (userId) {
-            return task.assignedUsers.some((user) => user.id === userId);
+            // Check if user is assigned to or is an assistant
+            return (task.assignedUser && task.assignedUser.id === userId) ||
+                   task.assistants.some((user) => user.id === userId);
           }
-          // Super Admin: apply status filter (only if status is not 'all')
+          
+          // Apply task assignment filter
+          if (taskAssignment === 'assigned-to-me' && !isAssignedToMe) {
+            return false;
+          }
+          if (taskAssignment === 'assigned-by-me' && !isAssignedByMe) {
+            return false;
+          }
+          
+          // Apply status filter (only if status is not 'all')
           if (status && status !== 'all' && task.status !== status) {
             return false;
           }
-          return true; // Super Admin sees all tasks
+          return true; // See all tasks
         }
 
-        // Non-Super Admin: show tasks assigned to them OR tasks they created
-        if (currentUserId) {
-          const isAssigned = task.assignedUsers.some((user) => user.id === currentUserId);
-          const rawTask = task.raw;
-          // Check various possible fields for creator ID (handle both string and object ID formats)
-          const createdBy = (rawTask as any).addedUserId || 
-                           (rawTask as any).createdBy || 
-                           (rawTask as any).createdById ||
-                           (rawTask as any).addedBy;
-          // Convert both to strings for comparison to handle any type mismatches
-          const isCreatedByUser = createdBy && String(createdBy) === String(currentUserId);
-          
-          // Check if task is visible to user (assigned or created by them)
-          const isVisible = isAssigned || isCreatedByUser;
-          
-          if (!isVisible) {
-            return false;
-          }
-          
-          // Apply status filter to all visible tasks (both assigned and created)
-          // Only skip filter if status is 'all' or not set
-          if (status && status !== 'all' && task.status !== status) {
-            return false;
-          }
-          
-          return true;
+        // Users without "See all tasks" permission: only show tasks assigned to them OR tasks they created
+        if (!currentUserId) {
+          return false; // If no currentUserId, don't show any tasks
         }
-
-        return false; // If no currentUserId, don't show any tasks
+        
+        // Task must be either assigned to user OR created by user
+        const isVisible = isAssignedToMe || isAssignedByMe;
+        
+        if (!isVisible) {
+          return false; // Hide tasks that are not assigned to or created by the user
+        }
+        
+        // Apply task assignment filter to further narrow down
+        if (taskAssignment === 'assigned-to-me' && !isAssignedToMe) {
+          return false;
+        }
+        if (taskAssignment === 'assigned-by-me' && !isAssignedByMe) {
+          return false;
+        }
+        
+        // Apply status filter to all visible tasks (both assigned and created)
+        // Only skip filter if status is 'all' or not set
+        if (status && status !== 'all' && task.status !== status) {
+          return false;
+        }
+        
+        return true;
       })
       .sort((a, b) => this.compareDatesDesc(a.dateOfRequest, b.dateOfRequest));
   });
@@ -512,7 +554,8 @@ export class MaintenanceOverviewComponent implements OnInit {
     const completed = tasks.filter((task) => task.status === 'completed').length;
     const overdue = tasks.filter((task) => task.isOverdue && task.status !== 'completed').length;
     const myTasks = tasks.filter((task) =>
-      task.assignedUsers.some((user) => user.id === this.currentUserId()),
+      (task.assignedUser && task.assignedUser.id === this.currentUserId()) ||
+      task.assistants.some((user) => user.id === this.currentUserId()),
     ).length;
 
     return [
@@ -601,11 +644,16 @@ export class MaintenanceOverviewComponent implements OnInit {
     this.selectedStatus.set(value as MaintenanceStatus);
   }
 
+  onTaskAssignmentChange(value: 'all' | 'assigned-to-me' | 'assigned-by-me'): void {
+    this.selectedTaskAssignment.set(value);
+  }
+
   clearFilters(): void {
     this.selectedDeveloperId.set(null);
     this.selectedProjectId.set(null);
     this.selectedCameraId.set(null);
     this.selectedTaskType.set(null);
+    this.selectedTaskAssignment.set('all');
 
     if (this.isSuperAdmin()) {
       this.selectedUserId.set(null);
@@ -1700,7 +1748,8 @@ export class MaintenanceOverviewComponent implements OnInit {
     this.editTaskForm.set({
       taskType: task.taskType,
       taskDescription: task.taskDescription,
-      assignedUsers: task.assignedUsers.map((user) => user.id),
+      assignedUser: task.assignedUser?.id || null,
+      assistants: task.assistants.map((user) => user.id),
       status: task.status,
       isSaving: false,
       error: null,
@@ -1726,10 +1775,10 @@ export class MaintenanceOverviewComponent implements OnInit {
     }
 
     const form = this.editTaskForm();
-    if (!form.taskType.trim() || !form.taskDescription.trim() || form.assignedUsers.length === 0) {
+    if (!form.taskType.trim() || !form.taskDescription.trim() || !form.assignedUser) {
       this.editTaskForm.update((state) => ({
         ...state,
-        error: 'Task type, description, and at least one assigned user are required.',
+        error: 'Task type, description, and assigned user are required.',
       }));
       return;
     }
@@ -1737,7 +1786,8 @@ export class MaintenanceOverviewComponent implements OnInit {
     const payload: MaintenanceUpdateRequest = {
       taskType: form.taskType.trim(),
       taskDescription: form.taskDescription.trim(),
-      assignedUsers: [...form.assignedUsers],
+      assignedUser: form.assignedUser,
+      assistants: form.assistants.length > 0 ? [...form.assistants] : undefined,
       status: form.status,
     };
 
@@ -2098,9 +2148,9 @@ export class MaintenanceOverviewComponent implements OnInit {
         }),
       )
       .subscribe((users) => {
-        const admins = users.filter((user) => user.role === 'Admin' || user.role === 'Super Admin');
-        const sorted = admins.sort((a, b) => a.name.localeCompare(b.name));
-        this.users.set(sorted);
+        // Store all users for looking up creators, but filter admins for the assigned user dropdown
+        const allUsers = users.sort((a, b) => a.name.localeCompare(b.name));
+        this.users.set(allUsers);
       });
   }
 
@@ -2109,9 +2159,33 @@ export class MaintenanceOverviewComponent implements OnInit {
     const project = task.projectId ? this.projectMap().get(task.projectId) : undefined;
     const camera = task.cameraId ? this.cameraMap().get(task.cameraId) : undefined;
 
-    const assignedIds = this.normalizeAssignedUsers(task);
-    const assignedUsers = assignedIds.reduce<AssignedUserInfo[]>((list, id) => {
-      const user = this.userMap().get(id);
+    // Extract assigned user (single) - "Assigned to"
+    // Priority: task.assignedUser > first item in assignedUsers (for backward compatibility)
+    const assignedUserId = task.assignedUser || (Array.isArray(task.assignedUsers) && task.assignedUsers.length > 0 ? task.assignedUsers[0] : null);
+    const assignedUserObj = assignedUserId ? this.userMap().get(String(assignedUserId)) : undefined;
+    const assignedUserInfo: AssignedUserInfo | undefined = assignedUserObj ? {
+      id: assignedUserObj._id,
+      name: assignedUserObj.name,
+      role: assignedUserObj.role,
+      image: this.getUserImageUrl(assignedUserObj),
+      logo: assignedUserObj.logo,
+    } : undefined;
+
+    // Extract assistants (multiple) - "Assistant"
+    // Priority: task.assistants > rest of assignedUsers (for backward compatibility)
+    let assistantIds: string[] = [];
+    if (task.assistants && Array.isArray(task.assistants)) {
+      assistantIds = task.assistants;
+    } else if (Array.isArray(task.assignedUsers) && task.assignedUsers.length > 1) {
+      // For backward compatibility: if assignedUser exists, assistants are the rest
+      assistantIds = task.assignedUsers.slice(1);
+    } else if (Array.isArray(task.assignedUsers) && !task.assignedUser) {
+      // If no assignedUser but assignedUsers exists, all are assistants (legacy)
+      assistantIds = task.assignedUsers;
+    }
+    
+    const assistants = assistantIds.reduce<AssignedUserInfo[]>((list, id) => {
+      const user = this.userMap().get(String(id));
       if (!user) {
         return list;
       }
@@ -2119,9 +2193,25 @@ export class MaintenanceOverviewComponent implements OnInit {
         id: user._id,
         name: user.name,
         role: user.role,
+        image: this.getUserImageUrl(user),
+        logo: user.logo,
       });
       return list;
     }, []);
+
+    // Extract creator/assigned by information
+    const createdBy = (task as any).addedUserId || 
+                     (task as any).createdBy || 
+                     (task as any).createdById ||
+                     (task as any).addedBy;
+    const assignedBy = createdBy ? this.userMap().get(String(createdBy)) : undefined;
+    const assignedByInfo: AssignedUserInfo | undefined = assignedBy ? {
+      id: assignedBy._id,
+      name: assignedBy.name,
+      role: assignedBy.role,
+      image: this.getUserImageUrl(assignedBy),
+      logo: assignedBy.logo,
+    } : undefined;
 
     const dateOfRequest = task.dateOfRequest ?? task.createdDate;
     const isOverdue = this.computeOverdue(task.status, dateOfRequest, task.completionTime);
@@ -2137,13 +2227,16 @@ export class MaintenanceOverviewComponent implements OnInit {
       projectName: project ? this.extractProjectName(project) : 'Unknown project',
       cameraId: task.cameraId,
       cameraName: camera ? this.extractCameraLabel(camera) : 'Unknown camera',
-      assignedUsers,
+      assignedUser: assignedUserInfo,
+      assistants,
+      assignedBy: assignedByInfo,
       status: this.normalizeStatus(task.status),
       dateOfRequest,
       createdDate: task.createdDate,
       startTime: task.startTime,
       completionTime: task.completionTime,
       userComment: task.userComment,
+      attachments: task.attachments,
       isOverdue,
       durationMinutes,
       raw: task,
@@ -2278,6 +2371,38 @@ export class MaintenanceOverviewComponent implements OnInit {
     return 'Unknown camera';
   }
 
+  private getUserImageUrl(user: User): string | undefined {
+    // Backend stores image in 'logo' field (path like 'logos/user/filename')
+    // Support both 'logo' and 'image' for compatibility
+    const imagePath = user.logo || user.image;
+    if (!imagePath) {
+      return undefined;
+    }
+    // If it's already a full URL, return as-is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://') || imagePath.startsWith('data:')) {
+      return imagePath;
+    }
+    // Build full URL from logo path (e.g., 'logos/user/filename.jpg')
+    const sanitized = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+    const mediaBaseUrl = environment.apiUrl.replace('/api', '');
+    return `${mediaBaseUrl}/${sanitized}`;
+  }
+
+  getAttachmentUrl(attachment: MaintenanceAttachment): string {
+    // Build full URL from attachment path
+    const url = attachment.url.startsWith('/') ? attachment.url.slice(1) : attachment.url;
+    const mediaBaseUrl = environment.apiUrl.replace('/api', '');
+    return `${mediaBaseUrl}/${url}`;
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  }
+
   private compareDatesDesc(a?: string, b?: string): number {
     const aTime = a ? Date.parse(a) : 0;
     const bTime = b ? Date.parse(b) : 0;
@@ -2289,14 +2414,22 @@ export class MaintenanceOverviewComponent implements OnInit {
   }
 
   // Multi-select dropdown state for assigned users
-  readonly isEditAssignedUsersDropdownOpen = signal(false);
+  readonly isEditAssistantsDropdownOpen = signal(false);
 
-  toggleEditAssignedUsersDropdown(): void {
-    this.isEditAssignedUsersDropdownOpen.update((v) => !v);
+  onEditAssignedUserChange(userId: string): void {
+    this.editTaskForm.update((state) => ({
+      ...state,
+      assignedUser: userId || null,
+      error: null,
+    }));
   }
 
-  toggleEditAssignedUserSelection(userId: string): void {
-    const current = this.editTaskForm().assignedUsers;
+  toggleEditAssistantsDropdown(): void {
+    this.isEditAssistantsDropdownOpen.update((v) => !v);
+  }
+
+  toggleEditAssistantSelection(userId: string): void {
+    const current = this.editTaskForm().assistants;
     let newSelection: string[];
 
     if (current.includes(userId)) {
@@ -2307,24 +2440,24 @@ export class MaintenanceOverviewComponent implements OnInit {
 
     this.editTaskForm.update((state) => ({
       ...state,
-      assignedUsers: newSelection,
+      assistants: newSelection,
       error: null,
     }));
   }
 
-  removeEditAssignedUser(userId: string): void {
-    const current = this.editTaskForm().assignedUsers;
+  removeEditAssistant(userId: string): void {
+    const current = this.editTaskForm().assistants;
     const newSelection = current.filter((id) => id !== userId);
 
     this.editTaskForm.update((state) => ({
       ...state,
-      assignedUsers: newSelection,
+      assistants: newSelection,
       error: null,
     }));
   }
 
-  isEditAssignedUserSelected(userId: string): boolean {
-    return this.editTaskForm().assignedUsers.includes(userId);
+  isEditAssistantSelected(userId: string): boolean {
+    return this.editTaskForm().assistants.includes(userId);
   }
 
   getAssignedUserLabel(userId: string): string {
@@ -2339,7 +2472,7 @@ export class MaintenanceOverviewComponent implements OnInit {
       !target.closest('.multi-select-dropdown') &&
       !target.closest('button[type="button"]')
     ) {
-      this.isEditAssignedUsersDropdownOpen.set(false);
+      this.isEditAssistantsDropdownOpen.set(false);
     }
   }
 }

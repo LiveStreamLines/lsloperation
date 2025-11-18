@@ -74,9 +74,18 @@
             <span class="text-xs text-slate-500">{{ user()?.role }}</span>
           </div>
         }
-        <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-100 text-sm font-semibold text-indigo-600">
-          {{ user()?.name?.charAt(0) || 'U' }}
-        </div>
+        @if (userImageUrl()) {
+          <div class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border-2 border-slate-200 bg-slate-100">
+            <img [src]="userImageUrl()" [alt]="user()?.name || 'User'" class="h-full w-full object-cover" (error)="$any($event.target).style.display='none'; $any($event.target).nextElementSibling.style.display='flex';" />
+            <div class="hidden h-full w-full items-center justify-center bg-indigo-100 text-sm font-semibold text-indigo-600">
+              {{ user()?.name?.charAt(0) || 'U' }}
+            </div>
+          </div>
+        } @else {
+          <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-100 text-sm font-semibold text-indigo-600">
+            {{ user()?.name?.charAt(0) || 'U' }}
+          </div>
+        }
         <button
           type="button"
           (click)="onLogout()"

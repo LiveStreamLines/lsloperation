@@ -15,12 +15,16 @@ import { User } from '@core/models/user.model';
 import { Developer } from '@core/models/developer.model';
 import { Project } from '@core/models/project.model';
 import { Camera } from '@core/models/camera.model';
+import { environment } from '@env';
 
 interface UserFormState {
   name: string;
   email: string;
   phone: string;
   role: string;
+  image: string | null; // Persisted image path
+  imageFile: File | null;
+  imagePreview: string | null;
   // Region access (for Admins)
   hasUaeAccess: boolean;
   hasSaudiAccess: boolean;
@@ -40,6 +44,7 @@ interface UserFormState {
   canCreateMonitorTask: boolean;
   canHoldMaintenance: boolean;
   canDeletePhoto: boolean;
+  canSeeAllTasks: boolean;
   // Operation permissions - inventory
   canAddDeviceType: boolean;
   canAddDeviceStock: boolean;
@@ -101,6 +106,7 @@ export class UserFormComponent implements OnInit {
   readonly submitted = signal(false);
   readonly resetEmail = signal('');
   readonly userForm = signal<UserFormState>(this.createEmptyForm());
+  readonly assetBaseUrl = environment.apiUrl.replace('/api', '');
 
   readonly developers = signal<Developer[]>([]);
   readonly projects = signal<Project[]>([]);
@@ -476,6 +482,7 @@ export class UserFormComponent implements OnInit {
             canCreateMonitorTask: false,
             canHoldMaintenance: false,
             canDeletePhoto: false,
+            canSeeAllTasks: false,
           }),
     }));
   }
@@ -607,6 +614,9 @@ export class UserFormComponent implements OnInit {
       email: '',
       phone: '',
       role: 'Admin',
+      image: null,
+      imageFile: null,
+      imagePreview: null,
       hasUaeAccess: false,
       hasSaudiAccess: false,
       canManageDevProjCam: false,
@@ -623,6 +633,7 @@ export class UserFormComponent implements OnInit {
       canCreateMonitorTask: false,
       canHoldMaintenance: false,
       canDeletePhoto: false,
+      canSeeAllTasks: false,
       canAddDeviceType: false,
       canAddDeviceStock: false,
       canAssignUnassignUser: false,
@@ -641,45 +652,50 @@ export class UserFormComponent implements OnInit {
       email: user.email || '',
       phone: user.phone || '',
       role: (user.role as string) || 'User',
-      hasUaeAccess: false,
-      hasSaudiAccess: false,
-      canManageDevProjCam: (user as any).canManageDevProjCam || false,
+      image: (user.logo || user.image) || null, // Backend uses 'logo', support both for compatibility
+      imageFile: null,
+      imagePreview: this.buildImagePreview(user.logo || user.image),
+      hasUaeAccess: this.normalizeBoolean((user as any).hasUaeAccess, false),
+      hasSaudiAccess: this.normalizeBoolean((user as any).hasSaudiAccess, false),
+      canManageDevProjCam: this.normalizeBoolean((user as any).canManageDevProjCam, false),
       hasCameraMonitorAccess: (user as any).hasCameraMonitorAccess !== undefined
-        ? !!(user as any).hasCameraMonitorAccess
+        ? this.normalizeBoolean((user as any).hasCameraMonitorAccess, false)
         : !!(
-            (user as any).canWatchCameraMonitor ||
-            (user as any).canCreateMonitorTask ||
-            (user as any).canHoldMaintenance ||
-            (user as any).canDeletePhoto
+            this.normalizeBoolean((user as any).canWatchCameraMonitor, false) ||
+            this.normalizeBoolean((user as any).canCreateMonitorTask, false) ||
+            this.normalizeBoolean((user as any).canHoldMaintenance, false) ||
+            this.normalizeBoolean((user as any).canDeletePhoto, false) ||
+            this.normalizeBoolean((user as any).canSeeAllTasks, false)
           ),
       hasInventoryAccess: (user as any).hasInventoryAccess !== undefined
-        ? !!(user as any).hasInventoryAccess
+        ? this.normalizeBoolean((user as any).hasInventoryAccess, false)
         : !!(
-            (user as any).canAddDeviceType ||
-            (user as any).canAddDeviceStock ||
-            (user as any).canAssignUnassignUser ||
-            (user as any).canAssignUnassignProject
+            this.normalizeBoolean((user as any).canAddDeviceType, false) ||
+            this.normalizeBoolean((user as any).canAddDeviceStock, false) ||
+            this.normalizeBoolean((user as any).canAssignUnassignUser, false) ||
+            this.normalizeBoolean((user as any).canAssignUnassignProject, false)
           ),
       hasMemoryAccess: (user as any).hasMemoryAccess !== undefined
-        ? !!(user as any).hasMemoryAccess
-        : !!((user as any).canArchiveMemory),
-      accessibleDevelopers: user.accessibleDevelopers || [],
-      accessibleProjects: user.accessibleProjects || [],
-      accessibleCameras: user.accessibleCameras || [],
+        ? this.normalizeBoolean((user as any).hasMemoryAccess, false)
+        : this.normalizeBoolean((user as any).canArchiveMemory, false),
+      accessibleDevelopers: this.normalizeArray(user.accessibleDevelopers),
+      accessibleProjects: this.normalizeArray(user.accessibleProjects),
+      accessibleCameras: this.normalizeArray(user.accessibleCameras),
       accessibleServices: user.accessibleServices && user.accessibleServices.length > 0
         ? user.accessibleServices
         : ['all'],
-      canAddUser: (user as any).canAddUser || false,
-      canGenerateVideoAndPics: (user as any).canGenerateVideoAndPics ?? true,
-      canWatchCameraMonitor: (user as any).canWatchCameraMonitor || false,
-      canCreateMonitorTask: (user as any).canCreateMonitorTask || false,
-      canHoldMaintenance: (user as any).canHoldMaintenance || false,
-      canDeletePhoto: (user as any).canDeletePhoto || false,
-      canAddDeviceType: (user as any).canAddDeviceType || false,
-      canAddDeviceStock: (user as any).canAddDeviceStock || false,
-      canAssignUnassignUser: (user as any).canAssignUnassignUser || false,
-      canAssignUnassignProject: (user as any).canAssignUnassignProject || false,
-      canArchiveMemory: (user as any).canArchiveMemory || false,
+      canAddUser: this.normalizeBoolean((user as any).canAddUser, false),
+      canGenerateVideoAndPics: this.normalizeBoolean((user as any).canGenerateVideoAndPics, true),
+      canWatchCameraMonitor: this.normalizeBoolean((user as any).canWatchCameraMonitor, false),
+      canCreateMonitorTask: this.normalizeBoolean((user as any).canCreateMonitorTask, false),
+      canHoldMaintenance: this.normalizeBoolean((user as any).canHoldMaintenance, false),
+      canDeletePhoto: this.normalizeBoolean((user as any).canDeletePhoto, false),
+      canSeeAllTasks: this.normalizeBoolean((user as any).canSeeAllTasks, false),
+      canAddDeviceType: this.normalizeBoolean((user as any).canAddDeviceType, false),
+      canAddDeviceStock: this.normalizeBoolean((user as any).canAddDeviceStock, false),
+      canAssignUnassignUser: this.normalizeBoolean((user as any).canAssignUnassignUser, false),
+      canAssignUnassignProject: this.normalizeBoolean((user as any).canAssignUnassignProject, false),
+      canArchiveMemory: this.normalizeBoolean((user as any).canArchiveMemory, false),
       memoryRole: (user as any).memoryRole || '',
       inventoryRole: (user as any).inventoryRole || '',
       isSaving: false,
@@ -703,42 +719,11 @@ export class UserFormComponent implements OnInit {
     this.userForm.update((f) => ({ ...f, isSaving: true, error: null }));
 
     const currentUser = this.authStore.user();
-    const payload: Partial<User> = {
-      name: form.name.trim(),
-      email: form.email.trim(),
-      phone: form.phone?.trim() || '',
-      role: form.role || 'User',
-      accessibleDevelopers: form.accessibleDevelopers,
-      accessibleProjects: form.accessibleProjects,
-      accessibleCameras: form.accessibleCameras,
-      // Always store services as "all"
-      accessibleServices: ['all'],
-      canAddUser: false, // Removed from UI, always set to false
-      // Always allow generating video and pics
-      canGenerateVideoAndPics: true,
-      canManageDevProjCam: form.canManageDevProjCam,
-      hasCameraMonitorAccess: form.hasCameraMonitorAccess,
-      hasInventoryAccess: form.hasInventoryAccess,
-      hasMemoryAccess: form.hasMemoryAccess,
-      canWatchCameraMonitor: form.canWatchCameraMonitor,
-      canCreateMonitorTask: form.canCreateMonitorTask,
-      canHoldMaintenance: form.canHoldMaintenance,
-      canDeletePhoto: form.canDeletePhoto,
-      canAddDeviceType: form.canAddDeviceType,
-      canAddDeviceStock: form.canAddDeviceStock,
-      canAssignUnassignUser: form.canAssignUnassignUser,
-      canAssignUnassignProject: form.canAssignUnassignProject,
-      canArchiveMemory: form.canArchiveMemory,
-      memoryRole: form.memoryRole || undefined,
-      inventoryRole: form.inventoryRole || undefined,
-      addedUserId: currentUser?.id,
-      addedUserName: currentUser?.name,
-      status: this.isEditMode() ? undefined : 'New',
-    };
+    const formData = this.buildFormData(form, currentUser);
 
     const request = this.isEditMode() && this.userId()
-      ? this.userService.update(this.userId()!, payload)
-      : this.userService.create(payload);
+      ? this.userService.update(this.userId()!, formData)
+      : this.userService.create(formData);
 
     request
       .pipe(
@@ -764,6 +749,146 @@ export class UserFormComponent implements OnInit {
           this.resetEmail.set(form.email);
         }
       });
+  }
+
+  onImageSelect(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) {
+      return;
+    }
+
+    const file = input.files[0];
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      this.userForm.update((form) => ({
+        ...form,
+        imageFile: file,
+        imagePreview: reader.result as string,
+        error: null,
+      }));
+    };
+
+    reader.readAsDataURL(file);
+  }
+
+  clearImage(): void {
+    this.userForm.update((form) => ({
+      ...form,
+      image: null,
+      imageFile: null,
+      imagePreview: null,
+      error: null,
+    }));
+  }
+
+  private buildImagePreview(image?: string | null): string | null {
+    if (!image) {
+      return null;
+    }
+    if (image.startsWith('http://') || image.startsWith('https://') || image.startsWith('data:')) {
+      return image;
+    }
+    const sanitized = image.startsWith('/') ? image.slice(1) : image;
+    return `${this.assetBaseUrl}/${sanitized}`;
+  }
+
+  private normalizeArray(value: unknown): string[] {
+    if (!value) {
+      return [];
+    }
+    if (Array.isArray(value)) {
+      return value.filter((item) => typeof item === 'string' && item.trim().length > 0);
+    }
+    if (typeof value === 'string') {
+      try {
+        // Try parsing as JSON first
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((item) => typeof item === 'string' && item.trim().length > 0);
+        }
+      } catch {
+        // If not JSON, try splitting by comma
+        return value.split(',').map((item) => item.trim()).filter((item) => item.length > 0);
+      }
+    }
+    return [];
+  }
+
+  private normalizeBoolean(value: unknown, defaultValue: boolean = false): boolean {
+    if (value === undefined || value === null) {
+      return defaultValue;
+    }
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      return value.toLowerCase() === 'true';
+    }
+    return !!value;
+  }
+
+  private buildFormData(form: UserFormState, currentUser: { id?: string; name?: string } | null): FormData {
+    const formData = new FormData();
+
+    formData.append('name', form.name.trim());
+    formData.append('email', form.email.trim());
+    formData.append('phone', form.phone?.trim() || '');
+    formData.append('role', form.role || 'User');
+
+    const appendBoolean = (key: string, value: boolean) => formData.append(key, value ? 'true' : 'false');
+    const appendString = (key: string, value?: string | null) => formData.append(key, value ?? '');
+    const appendArray = (key: string, value: string[]) => {
+      // Send arrays as JSON strings (backend expects this format for multer parsing)
+      // Multer parses FormData fields as strings, so arrays need to be JSON stringified
+      const arrayValue = Array.isArray(value) && value.length > 0 ? value : [];
+      formData.append(key, JSON.stringify(arrayValue));
+    };
+
+    appendBoolean('hasUaeAccess', form.hasUaeAccess);
+    appendBoolean('hasSaudiAccess', form.hasSaudiAccess);
+    appendBoolean('canManageDevProjCam', form.canManageDevProjCam);
+    appendBoolean('hasCameraMonitorAccess', form.hasCameraMonitorAccess);
+    appendBoolean('hasInventoryAccess', form.hasInventoryAccess);
+    appendBoolean('hasMemoryAccess', form.hasMemoryAccess);
+    appendBoolean('canAddUser', false);
+    appendBoolean('canGenerateVideoAndPics', true);
+    appendBoolean('canWatchCameraMonitor', form.canWatchCameraMonitor);
+    appendBoolean('canCreateMonitorTask', form.canCreateMonitorTask);
+    appendBoolean('canHoldMaintenance', form.canHoldMaintenance);
+    appendBoolean('canDeletePhoto', form.canDeletePhoto);
+    appendBoolean('canSeeAllTasks', form.canSeeAllTasks);
+    appendBoolean('canAddDeviceType', form.canAddDeviceType);
+    appendBoolean('canAddDeviceStock', form.canAddDeviceStock);
+    appendBoolean('canAssignUnassignUser', form.canAssignUnassignUser);
+    appendBoolean('canAssignUnassignProject', form.canAssignUnassignProject);
+    appendBoolean('canArchiveMemory', form.canArchiveMemory);
+
+    appendArray('accessibleDevelopers', form.accessibleDevelopers);
+    appendArray('accessibleProjects', form.accessibleProjects);
+    appendArray('accessibleCameras', form.accessibleCameras);
+    appendArray('accessibleServices', ['all']);
+
+    appendString('memoryRole', form.memoryRole || undefined);
+    appendString('inventoryRole', form.inventoryRole || undefined);
+
+    if (!this.isEditMode()) {
+      appendString('status', 'New');
+    }
+    if (currentUser?.id) {
+      appendString('addedUserId', currentUser.id);
+    }
+    if (currentUser?.name) {
+      appendString('addedUserName', currentUser.name);
+    }
+
+    if (form.imageFile) {
+      formData.append('image', form.imageFile);
+    } else if (this.isEditMode() && form.image) {
+      formData.append('image', form.image);
+    }
+
+    return formData;
   }
 
   sendResetPasswordLink(): void {

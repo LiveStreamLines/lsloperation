@@ -10,6 +10,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { AuthStore } from '@core/auth/auth.store';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
+import { environment } from '@env';
 
 interface NavItem {
   label: string;
@@ -34,6 +35,25 @@ export class ShellComponent {
   readonly isSigningOut = signal(false);
 
   readonly user = this.authStore.user;
+
+  readonly userImageUrl = computed(() => {
+    const currentUser = this.user();
+    if (!currentUser) return undefined;
+    // Backend stores image in 'logo' field (path like 'logos/user/filename')
+    // Support both 'logo' and 'image' for compatibility
+    const imagePath = (currentUser as any).logo || currentUser.image;
+    if (!imagePath) {
+      return undefined;
+    }
+    // If it's already a full URL, return as-is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://') || imagePath.startsWith('data:')) {
+      return imagePath;
+    }
+    // Build full URL from logo path (e.g., 'logos/user/filename.jpg')
+    const sanitized = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+    const mediaBaseUrl = environment.apiUrl.replace('/api', '');
+    return `${mediaBaseUrl}/${sanitized}`;
+  });
 
   readonly navItems = computed(() => {
     const currentUser = this.user();
