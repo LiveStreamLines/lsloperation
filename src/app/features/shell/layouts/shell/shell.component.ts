@@ -80,8 +80,13 @@ export class ShellComponent {
       });
     }
 
-    // Developers, Projects, Cameras - Super Admin or users with manage permission
-    if (isSuperAdmin || (currentUser as any).canManageDevProjCam) {
+    // Developers, Projects, Cameras - Super Admin sees all, others based on manage permission
+    const canManageDevProjCam = (currentUser as any).canManageDevProjCam;
+    const hasAllPermission = canManageDevProjCam === 'all';
+    const hasCameraConfigPermission = canManageDevProjCam === 'camera_configuration';
+    
+    if (isSuperAdmin || hasAllPermission) {
+      // Super Admin or "All" permission: Show all: Developers, Projects, and Cameras
       items.push({
         label: 'Developers',
         path: '/developers',
@@ -97,7 +102,15 @@ export class ShellComponent {
         path: '/cameras',
         description: 'Fleet visibility and stream quality',
       });
+    } else if (hasCameraConfigPermission) {
+      // "Camera Configuration" permission: Show only Cameras
+      items.push({
+        label: 'Cameras',
+        path: '/cameras',
+        description: 'Fleet visibility and stream quality',
+      });
     }
+    // If none or null, don't show any of these modules
 
     // Inventory - Super Admin or users with inventory access
     if (isSuperAdmin || (currentUser as any).hasInventoryAccess) {

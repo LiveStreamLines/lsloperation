@@ -483,17 +483,48 @@
 
             <!-- Manage Developers / Projects / Cameras -->
             <div class="space-y-2">
-              <div class="grid gap-3 md:grid-cols-2">
-                <label class="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
-                    [ngModel]="userForm().canManageDevProjCam"
-                    (ngModelChange)="updateFormField('canManageDevProjCam', $event)"
-                    [ngModelOptions]="{standalone: true}"
-                  />
-                  <span>Manage Developer / Project / Cameras</span>
+              <div class="space-y-2">
+                <label class="block text-sm font-medium text-slate-700">
+                  Manage Developer / Project / Cameras
                 </label>
+                <div class="flex flex-col gap-2">
+                  <label class="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="radio"
+                      name="canManageDevProjCam"
+                      class="h-4 w-4 border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                      value=""
+                      [ngModel]="userForm().canManageDevProjCam || ''"
+                      (ngModelChange)="updateFormField('canManageDevProjCam', $event === '' ? null : $event)"
+                      [ngModelOptions]="{standalone: true}"
+                    />
+                    <span>None</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="radio"
+                      name="canManageDevProjCam"
+                      class="h-4 w-4 border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                      value="all"
+                      [ngModel]="userForm().canManageDevProjCam"
+                      (ngModelChange)="updateFormField('canManageDevProjCam', 'all')"
+                      [ngModelOptions]="{standalone: true}"
+                    />
+                    <span>All</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="radio"
+                      name="canManageDevProjCam"
+                      class="h-4 w-4 border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                      value="camera_configuration"
+                      [ngModel]="userForm().canManageDevProjCam"
+                      (ngModelChange)="updateFormField('canManageDevProjCam', 'camera_configuration')"
+                      [ngModelOptions]="{standalone: true}"
+                    />
+                    <span>Camera Configuration</span>
+                  </label>
+                </div>
               </div>
             </div>
 

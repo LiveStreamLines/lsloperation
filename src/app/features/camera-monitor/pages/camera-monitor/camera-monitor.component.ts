@@ -46,7 +46,7 @@ type CameraStatus =
   | 'maintenance_long_time'
   | 'finished';
 
-type CameraStatusFilter = 'all' | CameraStatus | 'maintenance_less_images' | 'maintenance_photo_dirty';
+type CameraStatusFilter = 'all' | CameraStatus | 'maintenance_less_images' | 'maintenance_photo_dirty' | 'device_expired' | 'memory_full';
 
 interface CountryOption {
   value: string;
@@ -1868,8 +1868,89 @@ export class CameraMonitorComponent implements OnInit {
       return isMaintenanceStatus && !!camera.maintenanceStatusPhotoDirty;
     }
 
+    // Virtual filter: device expired (under maintenance)
+    if (status === 'device_expired') {
+      // Only show cameras that are in maintenance status AND device is expired
+      const isMaintenanceStatus =
+        camera.status === 'maintenance' || camera.status === 'maintenance_long_time';
+      if (!isMaintenanceStatus) {
+        return false;
+      }
+      // Check if device is expired based on installedDate or expiration date
+      const cameraData = camera.camera;
+      if (cameraData.installedDate) {
+        const installedDate = new Date(cameraData.installedDate);
+        const now = new Date();
+        // Assuming device expires after a certain period (e.g., 5 years)
+        // This logic should be adjusted based on actual requirements
+        const expirationPeriod = 5 * 365 * 24 * 60 * 60 * 1000; // 5 years in milliseconds
+        const expirationDate = new Date(installedDate.getTime() + expirationPeriod);
+        return now > expirationDate;
+      }
+      // Check for explicit expiration date if available
+      const expirationDate = (cameraData as any).expirationDate || (cameraData as any).deviceExpirationDate;
+      if (expirationDate) {
+        return new Date() > new Date(expirationDate);
+      }
+      return false;
+    }
+
+    // Virtual filter: memory full (under maintenance)
+    if (status === 'memory_full') {
+      // Only show cameras that are in maintenance status AND memory is full
+      const isMaintenanceStatus =
+        camera.status === 'maintenance' || camera.status === 'maintenance_long_time';
+      if (!isMaintenanceStatus) {
+        return false;
+      }
+      // Check if memory is full based on memory data
+      // This can be extended to check actual memory data from memory service
+      const cameraData = camera.camera;
+      const memoryAvailable = (cameraData as any).memoryAvailable;
+      if (memoryAvailable) {
+        // Parse memory available (could be in format like "5 GB" or "5000 MB")
+        const memoryValue = this.parseMemorySize(memoryAvailable);
+        // Consider memory full if less than 1 GB available
+        return memoryValue < 1;
+      }
+      // Check if memoryUsed indicates full memory
+      const memoryUsed = (cameraData as any).memoryUsed;
+      if (memoryUsed) {
+        const usedValue = this.parseMemorySize(memoryUsed);
+        // If memory used is very high (e.g., > 95%), consider it full
+        // This is a placeholder - actual logic should check total memory capacity
+        return usedValue > 0 && (cameraData as any).memoryPercentage > 95;
+      }
+      return false;
+    }
+
     // Exact match for all other statuses
     return camera.status === status;
+  }
+
+  private parseMemorySize(memorySize: string): number {
+    if (!memorySize || typeof memorySize !== 'string') {
+      return 0;
+    }
+    const normalized = memorySize.trim().toUpperCase();
+    const match = normalized.match(/^([\d.]+)\s*(GB|MB|KB|B)?$/);
+    if (!match) {
+      return 0;
+    }
+    const value = parseFloat(match[1]);
+    const unit = match[2] || 'GB';
+    switch (unit) {
+      case 'GB':
+        return value;
+      case 'MB':
+        return value / 1024;
+      case 'KB':
+        return value / (1024 * 1024);
+      case 'B':
+        return value / (1024 * 1024 * 1024);
+      default:
+        return value;
+    }
   }
 
   private coerceCountryValue(value: string): string {

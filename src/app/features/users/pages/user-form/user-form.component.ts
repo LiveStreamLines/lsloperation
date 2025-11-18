@@ -29,7 +29,7 @@ interface UserFormState {
   hasUaeAccess: boolean;
   hasSaudiAccess: boolean;
   // High-level operation permissions
-  canManageDevProjCam: boolean;
+  canManageDevProjCam: 'all' | 'camera_configuration' | null;
   hasCameraMonitorAccess: boolean;
   hasInventoryAccess: boolean;
   hasMemoryAccess: boolean;
@@ -357,7 +357,7 @@ export class UserFormComponent implements OnInit {
     if (role === 'Super Admin') {
       this.userForm.update((form) => ({
         ...form,
-        canManageDevProjCam: false,
+        canManageDevProjCam: null,
         hasCameraMonitorAccess: false,
         hasInventoryAccess: false,
         hasMemoryAccess: false,
@@ -375,7 +375,7 @@ export class UserFormComponent implements OnInit {
     } else if (role === 'Admin') {
       this.userForm.update((form) => ({
         ...form,
-        canManageDevProjCam: form.canManageDevProjCam || false,
+        canManageDevProjCam: form.canManageDevProjCam || null,
         hasCameraMonitorAccess: form.hasCameraMonitorAccess || false,
         hasInventoryAccess: form.hasInventoryAccess || false,
         hasMemoryAccess: form.hasMemoryAccess || false,
@@ -388,7 +388,7 @@ export class UserFormComponent implements OnInit {
     } else {
       this.userForm.update((form) => ({
         ...form,
-        canManageDevProjCam: false,
+        canManageDevProjCam: null,
         hasCameraMonitorAccess: false,
         hasInventoryAccess: false,
         hasMemoryAccess: false,
@@ -619,7 +619,7 @@ export class UserFormComponent implements OnInit {
       imagePreview: null,
       hasUaeAccess: false,
       hasSaudiAccess: false,
-      canManageDevProjCam: false,
+      canManageDevProjCam: null,
       hasCameraMonitorAccess: false,
       hasInventoryAccess: false,
       hasMemoryAccess: false,
@@ -657,7 +657,7 @@ export class UserFormComponent implements OnInit {
       imagePreview: this.buildImagePreview(user.logo || user.image),
       hasUaeAccess: this.normalizeBoolean((user as any).hasUaeAccess, false),
       hasSaudiAccess: this.normalizeBoolean((user as any).hasSaudiAccess, false),
-      canManageDevProjCam: this.normalizeBoolean((user as any).canManageDevProjCam, false),
+      canManageDevProjCam: this.normalizeManageDevProjCam((user as any).canManageDevProjCam),
       hasCameraMonitorAccess: (user as any).hasCameraMonitorAccess !== undefined
         ? this.normalizeBoolean((user as any).hasCameraMonitorAccess, false)
         : !!(
@@ -828,6 +828,26 @@ export class UserFormComponent implements OnInit {
     return !!value;
   }
 
+  private normalizeManageDevProjCam(value: unknown): 'all' | 'camera_configuration' | null {
+    if (value === undefined || value === null || value === false || value === '') {
+      return null;
+    }
+    if (typeof value === 'string') {
+      if (value === 'all' || value === 'camera_configuration') {
+        return value;
+      }
+      // Legacy: if it's 'true' or boolean true, default to 'all' for backward compatibility
+      if (value.toLowerCase() === 'true') {
+        return 'all';
+      }
+    }
+    if (typeof value === 'boolean' && value === true) {
+      // Legacy: boolean true defaults to 'all' for backward compatibility
+      return 'all';
+    }
+    return null;
+  }
+
   private buildFormData(form: UserFormState, currentUser: { id?: string; name?: string } | null): FormData {
     const formData = new FormData();
 
@@ -847,7 +867,9 @@ export class UserFormComponent implements OnInit {
 
     appendBoolean('hasUaeAccess', form.hasUaeAccess);
     appendBoolean('hasSaudiAccess', form.hasSaudiAccess);
-    appendBoolean('canManageDevProjCam', form.canManageDevProjCam);
+    // canManageDevProjCam is now a string: 'all', 'camera_configuration', or empty string
+    // Always send the value, even if null (send as empty string)
+    formData.append('canManageDevProjCam', form.canManageDevProjCam || '');
     appendBoolean('hasCameraMonitorAccess', form.hasCameraMonitorAccess);
     appendBoolean('hasInventoryAccess', form.hasInventoryAccess);
     appendBoolean('hasMemoryAccess', form.hasMemoryAccess);

@@ -356,6 +356,23 @@
                   @if (isSuperAdmin()) {
                     <button
                       type="button"
+                      class="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      (click)="openCancelTaskModal(task)"
+                      [disabled]="task.status === 'completed' || task.status === 'cancelled'"
+                    >
+                      <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                        <path
+                          fill-rule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                      Cancel
+                    </button>
+                  }
+                  @if (isSuperAdmin()) {
+                    <button
+                      type="button"
                       class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
                       (click)="openEditTaskModal(task)"
                     >
@@ -1349,6 +1366,91 @@
             </button>
           </div>
         </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (cancelTaskModal()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+      <div class="relative w-full max-w-xl rounded-3xl bg-white shadow-2xl">
+        <button
+          type="button"
+          class="absolute right-4 top-4 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900"
+          (click)="closeCancelTaskModal()"
+          [disabled]="cancelTaskForm().isSaving"
+        >
+          <span class="sr-only">Close modal</span>
+          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path
+              d="M6.28 5.22a.75.75 0 10-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z"
+            />
+          </svg>
+        </button>
+
+        <div class="max-h-[80vh] overflow-y-auto p-8">
+          <div class="space-y-6">
+            <header>
+              <h2 class="text-xl font-semibold text-slate-900">Cancel task</h2>
+              <p class="mt-1 text-sm text-slate-500">
+                Provide a reason for cancelling this task (minimum 10 characters). The task status will be changed to "cancelled".
+              </p>
+            </header>
+
+            @if (cancelTaskForm().error) {
+              <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {{ cancelTaskForm().error }}
+              </div>
+            }
+
+            <section class="space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <div>
+                <h3 class="text-sm font-semibold text-slate-900">Task details</h3>
+                <div class="mt-2 space-y-1 text-sm text-slate-600">
+                  <p><span class="font-semibold">Type:</span> {{ cancelTaskModal()?.taskType }}</p>
+                  <p><span class="font-semibold">Camera:</span> {{ cancelTaskModal()?.cameraName }}</p>
+                  <p><span class="font-semibold">Project:</span> {{ cancelTaskModal()?.projectName }}</p>
+                  <p><span class="font-semibold">Developer:</span> {{ cancelTaskModal()?.developerName }}</p>
+                </div>
+              </div>
+            </section>
+
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+              <span class="font-semibold text-slate-800">Cancellation reason <span class="text-rose-500">*</span></span>
+              <textarea
+                rows="4"
+                class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                [value]="cancelTaskForm().reason"
+                (input)="onCancelReasonChange($any($event.target).value)"
+                placeholder="Explain why this task is being cancelled..."
+              ></textarea>
+              <span class="text-xs text-slate-400">
+                {{ cancelTaskForm().reason.trim().length }} / 10 chars minimum
+              </span>
+            </label>
+
+            <div class="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                (click)="closeCancelTaskModal()"
+                [disabled]="cancelTaskForm().isSaving"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center rounded-2xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-rose-300 transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+                (click)="saveCancelTask()"
+                [disabled]="cancelTaskForm().isSaving || cancelTaskForm().reason.trim().length < 10"
+              >
+                <span>{{ cancelTaskForm().isSaving ? 'Cancelling…' : 'Cancel task' }}</span>
+                @if (cancelTaskForm().isSaving) {
+                  <span class="ml-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                }
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

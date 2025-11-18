@@ -170,6 +170,12 @@ interface CompleteTaskFormState {
   actions: CompletionChecklist;
 }
 
+interface CancelTaskFormState {
+  reason: string;
+  isSaving: boolean;
+  error: string | null;
+}
+
 type ToastTone = 'success' | 'error';
 
 const OVERDUE_THRESHOLD_HOURS = 48;
@@ -247,6 +253,13 @@ export class MaintenanceOverviewComponent implements OnInit {
       addItems: false,
       removeItems: false,
     },
+  });
+
+  readonly cancelTaskModal = signal<UiMaintenance | null>(null);
+  readonly cancelTaskForm = signal<CancelTaskFormState>({
+    reason: '',
+    isSaving: false,
+    error: null,
   });
 
   readonly completeMaterialsState = signal<ReplaceMaterialsState>({
@@ -721,6 +734,87 @@ export class MaintenanceOverviewComponent implements OnInit {
     this.completeTaskModal.set(null);
     this.completeMaterialsState.set({ ...this.emptyReplaceState });
     this.resetCompletionInventoryState();
+  }
+
+  openCancelTaskModal(task: UiMaintenance): void {
+    if (!this.isSuperAdmin()) {
+      return;
+    }
+    if (!task.raw._id || task.status === 'completed' || task.status === 'cancelled') {
+      return;
+    }
+
+    this.cancelTaskModal.set(task);
+    this.cancelTaskForm.set({
+      reason: '',
+      isSaving: false,
+      error: null,
+    });
+  }
+
+  closeCancelTaskModal(): void {
+    this.cancelTaskModal.set(null);
+  }
+
+  onCancelReasonChange(value: string): void {
+    this.cancelTaskForm.update((state) => ({
+      ...state,
+      reason: value,
+      error: null,
+    }));
+  }
+
+  async saveCancelTask(): Promise<void> {
+    const task = this.cancelTaskModal();
+    if (!task?.raw._id) {
+      return;
+    }
+
+    const form = this.cancelTaskForm();
+    const reason = form.reason.trim();
+    if (reason.length < 10) {
+      this.cancelTaskForm.update((state) => ({
+        ...state,
+        error: 'Please provide a cancellation reason (minimum 10 characters).',
+      }));
+      return;
+    }
+
+    this.cancelTaskForm.update((state) => ({ ...state, isSaving: true, error: null }));
+
+    try {
+      const payload: MaintenanceUpdateRequest = {
+        status: 'cancelled',
+        userComment: reason,
+      };
+
+      const updated = await firstValueFrom(
+        this.maintenanceService.update(task.raw._id, payload).pipe(
+          catchError((error) => {
+            console.error('Failed to cancel task', error);
+            this.cancelTaskForm.update((state) => ({
+              ...state,
+              isSaving: false,
+              error: 'Unable to cancel task. Please try again.',
+            }));
+            return of(null);
+          }),
+        ),
+      );
+
+      if (updated) {
+        this.patchTask(updated);
+        this.showToast('Task cancelled successfully.', 'success');
+        this.closeCancelTaskModal();
+      }
+    } catch (error) {
+      console.error('Error cancelling task', error);
+      this.cancelTaskForm.update((state) => ({
+        ...state,
+        isSaving: false,
+        error: 'An error occurred while cancelling the task.',
+      }));
+    }
   }
 
   async saveCompleteTask(): Promise<void> {
