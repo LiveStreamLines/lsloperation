@@ -154,6 +154,7 @@ interface CompletionChecklist {
     materialReplacement: boolean;
     lockChecked: boolean;
     memoryChanging: boolean;
+    betterViewSurvey: boolean;
   };
   removal: boolean;
   installation: boolean;
@@ -168,6 +169,7 @@ interface CompleteTaskFormState {
   error: string | null;
   breakdownReason: string;
   actions: CompletionChecklist;
+  selectedFiles: File[];
 }
 
 interface CancelTaskFormState {
@@ -236,6 +238,7 @@ export class MaintenanceOverviewComponent implements OnInit {
     isSaving: false,
     error: null,
     breakdownReason: '',
+    selectedFiles: [],
     actions: {
       breakdown: false,
       breakdownNone: false,
@@ -246,6 +249,7 @@ export class MaintenanceOverviewComponent implements OnInit {
         materialReplacement: false,
         lockChecked: false,
         memoryChanging: false,
+        betterViewSurvey: false,
       },
       removal: false,
       installation: false,
@@ -350,12 +354,13 @@ export class MaintenanceOverviewComponent implements OnInit {
         materialReplacement: false,
         lockChecked: false,
         memoryChanging: false,
+        betterViewSurvey: false,
       },
       removal: false,
       installation: false,
       reinstallation: false,
-    addItems: false,
-    removeItems: false,
+      addItems: false,
+      removeItems: false,
     };
   }
 
@@ -723,6 +728,7 @@ export class MaintenanceOverviewComponent implements OnInit {
       isSaving: false,
       error: null,
       breakdownReason: '',
+      selectedFiles: [],
       actions: this.createDefaultCompletionActions(),
     });
 
@@ -1018,15 +1024,43 @@ export class MaintenanceOverviewComponent implements OnInit {
         }
       }
 
-      const updated = await firstValueFrom(
-        this.maintenanceService.completeTask(task.raw._id, finalComment).pipe(
-          takeUntilDestroyed(this.destroyRef),
-          catchError((error) => {
-            console.error('Failed to complete maintenance task', error);
-            return of<Maintenance | null>(null);
-          }),
-        ),
-      );
+      // Handle file uploads if any files are selected
+      const selectedFiles = form.selectedFiles || [];
+      let updated: Maintenance | null = null;
+
+      if (selectedFiles.length > 0) {
+        // Use FormData for file uploads
+        const formData = new FormData();
+        formData.append('status', 'completed');
+        formData.append('completionTime', new Date().toISOString());
+        formData.append('userComment', finalComment);
+
+        // Append files
+        for (const file of selectedFiles) {
+          formData.append('attachments', file);
+        }
+
+        updated = await firstValueFrom(
+          this.maintenanceService.completeTaskWithFiles(task.raw._id, formData).pipe(
+            takeUntilDestroyed(this.destroyRef),
+            catchError((error) => {
+              console.error('Failed to complete maintenance task with files', error);
+              return of<Maintenance | null>(null);
+            }),
+          ),
+        );
+      } else {
+        // Use regular JSON payload when no files
+        updated = await firstValueFrom(
+          this.maintenanceService.completeTask(task.raw._id, finalComment).pipe(
+            takeUntilDestroyed(this.destroyRef),
+            catchError((error) => {
+              console.error('Failed to complete maintenance task', error);
+              return of<Maintenance | null>(null);
+            }),
+          ),
+        );
+      }
 
       if (!updated) {
         throw new Error('Task completion failed.');
@@ -1204,6 +1238,7 @@ export class MaintenanceOverviewComponent implements OnInit {
             next.maintenance.cleaning = false;
             next.maintenance.viewAdjustment = false;
             next.maintenance.materialReplacement = false;
+            next.maintenance.betterViewSurvey = false;
             next.maintenance.lockChecked = false;
           }
           break;
@@ -1219,6 +1254,7 @@ export class MaintenanceOverviewComponent implements OnInit {
               materialReplacement: false,
               lockChecked: false,
               memoryChanging: false,
+              betterViewSurvey: false,
             };
             next.addItems = false;
             next.removeItems = false;
@@ -1238,6 +1274,7 @@ export class MaintenanceOverviewComponent implements OnInit {
               materialReplacement: false,
               lockChecked: false,
               memoryChanging: false,
+              betterViewSurvey: false,
             };
             next.addItems = false;
             next.removeItems = false;
@@ -1257,6 +1294,7 @@ export class MaintenanceOverviewComponent implements OnInit {
               materialReplacement: false,
               lockChecked: false,
               memoryChanging: false,
+              betterViewSurvey: false,
             };
             next.addItems = false;
             next.removeItems = false;
@@ -1301,7 +1339,7 @@ export class MaintenanceOverviewComponent implements OnInit {
   }
 
   toggleMaintenanceOption(
-    option: 'cleaning' | 'viewAdjustment' | 'materialReplacement' | 'lockChecked' | 'memoryChanging',
+    option: 'cleaning' | 'viewAdjustment' | 'materialReplacement' | 'lockChecked' | 'memoryChanging' | 'betterViewSurvey',
     value: boolean,
   ): void {
     this.setCompletionActions((current) => {
@@ -1521,6 +1559,9 @@ export class MaintenanceOverviewComponent implements OnInit {
       }
       if (actions.maintenance.materialReplacement) {
         maintenanceDetails.push('material replacement');
+      }
+      if (actions.maintenance.betterViewSurvey) {
+        maintenanceDetails.push('better view survey');
       }
 
       if (maintenanceDetails.length > 0) {
@@ -1939,6 +1980,56 @@ export class MaintenanceOverviewComponent implements OnInit {
       ...state,
       comment: value,
       error: null,
+    }));
+  }
+
+  onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) {
+      return;
+    }
+
+    const files = Array.from(input.files);
+    const maxFileSize = 10 * 1024 * 1024; // 10MB
+    const maxFiles = 10;
+
+    // Check total file count
+    const currentFiles = this.completeTaskForm().selectedFiles;
+    if (currentFiles.length + files.length > maxFiles) {
+      this.completeTaskForm.update((state) => ({
+        ...state,
+        error: `Maximum ${maxFiles} files allowed. You have ${currentFiles.length} files selected.`,
+      }));
+      return;
+    }
+
+    // Validate file sizes
+    const oversizedFiles = files.filter((file) => file.size > maxFileSize);
+    if (oversizedFiles.length > 0) {
+      this.completeTaskForm.update((state) => ({
+        ...state,
+        error: `Some files exceed the 10MB limit: ${oversizedFiles.map((f) => f.name).join(', ')}`,
+      }));
+      return;
+    }
+
+    // Add valid files
+    this.completeTaskForm.update((state) => ({
+      ...state,
+      selectedFiles: [...state.selectedFiles, ...files],
+      error: null,
+    }));
+
+    // Reset input to allow selecting the same file again
+    input.value = '';
+  }
+
+  removeSelectedFile(file: File): void {
+    this.completeTaskForm.update((state) => ({
+      ...state,
+      selectedFiles: state.selectedFiles.filter(
+        (f) => !(f.name === file.name && f.size === file.size && f.lastModified === file.lastModified),
+      ),
     }));
   }
 
@@ -2495,6 +2586,24 @@ export class MaintenanceOverviewComponent implements OnInit {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  }
+
+  getAssignmentAttachments(attachments: MaintenanceAttachment[] | undefined): MaintenanceAttachment[] {
+    if (!attachments || attachments.length === 0) {
+      return [];
+    }
+    // Return attachments with context 'assignment' or no context (for backward compatibility)
+    return attachments.filter(
+      (att) => !att.context || att.context === 'assignment',
+    );
+  }
+
+  getCompletionAttachments(attachments: MaintenanceAttachment[] | undefined): MaintenanceAttachment[] {
+    if (!attachments || attachments.length === 0) {
+      return [];
+    }
+    // Return attachments with context 'completion'
+    return attachments.filter((att) => att.context === 'completion');
   }
 
   private compareDatesDesc(a?: string, b?: string): number {

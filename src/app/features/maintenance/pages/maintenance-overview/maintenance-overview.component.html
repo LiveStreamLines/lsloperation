@@ -370,7 +370,8 @@
                       Cancel
                     </button>
                   }
-                  @if (isSuperAdmin()) {
+                  <!-- Edit button temporarily hidden -->
+                  <!-- @if (isSuperAdmin()) {
                     <button
                       type="button"
                       class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
@@ -383,23 +384,23 @@
                       </svg>
                       Edit
                     </button>
-                    <!-- Temporarily hidden - Install materials button -->
-                    <!-- @if (task.cameraId) {
-                      <button
-                        type="button"
-                        class="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-600 transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        (click)="openInstallMaterialsModal(task)"
-                        [disabled]="completeTaskForm().isSaving"
-                      >
-                        <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
-                          <path
-                            d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                          />
-                        </svg>
-                        Install materials
-                      </button>
-                    } -->
-                  }
+                  } -->
+                  <!-- Temporarily hidden - Install materials button -->
+                  <!-- @if (task.cameraId) {
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-600 transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      (click)="openInstallMaterialsModal(task)"
+                      [disabled]="completeTaskForm().isSaving"
+                    >
+                      <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
+                        <path
+                          d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                        />
+                      </svg>
+                      Install materials
+                    </button>
+                  } -->
                 </div>
               </div>
             </div>
@@ -466,35 +467,69 @@
                   <p class="mt-1 text-sm text-slate-600">{{ task.userComment }}</p>
                 </div>
               }
-              @if (task.attachments && task.attachments.length > 0) {
-                <div class="md:col-span-2 lg:col-span-4">
-                  <p class="font-semibold text-slate-700">Attachments</p>
-                  <div class="mt-2 space-y-2">
-                    @for (attachment of task.attachments; track attachment._id) {
-                      <a
-                        [href]="getAttachmentUrl(attachment)"
-                        [download]="attachment.originalName"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 transition hover:border-indigo-300 hover:bg-indigo-50"
-                      >
-                        <div class="flex items-center gap-3 flex-1 min-w-0">
-                          <svg class="h-5 w-5 flex-shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                          </svg>
-                          <div class="flex-1 min-w-0">
-                            <p class="text-xs font-semibold text-slate-700 truncate">{{ attachment.originalName }}</p>
-                            <p class="text-xs text-slate-500">{{ formatFileSize(attachment.size) }}</p>
-                          </div>
-                        </div>
-                        <svg class="h-4 w-4 flex-shrink-0 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </a>
+              <div class="md:col-span-2 lg:col-span-4">
+                <p class="font-semibold text-slate-700">Attachments</p>
+                <div class="mt-2 space-y-3">
+                  @if (task.attachments && task.attachments.length > 0) {
+                    @if (getAssignmentAttachments(task.attachments).length > 0) {
+                      <div class="space-y-2">
+                        <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide">Assignment attachments</p>
+                        @for (attachment of getAssignmentAttachments(task.attachments); track attachment._id) {
+                          <a
+                            [href]="getAttachmentUrl(attachment)"
+                            [download]="attachment.originalName"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 transition hover:border-blue-300 hover:bg-blue-100"
+                          >
+                            <div class="flex items-center gap-3 flex-1 min-w-0">
+                              <svg class="h-5 w-5 flex-shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                              </svg>
+                              <div class="flex-1 min-w-0">
+                                <p class="text-xs font-semibold text-slate-700 truncate">{{ attachment.originalName }}</p>
+                                <p class="text-xs text-slate-500">{{ formatFileSize(attachment.size) }}</p>
+                              </div>
+                            </div>
+                            <svg class="h-4 w-4 flex-shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                          </a>
+                        }
+                      </div>
                     }
-                  </div>
+                    @if (getCompletionAttachments(task.attachments).length > 0) {
+                      <div class="space-y-2">
+                        <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide">Completion attachments</p>
+                        @for (attachment of getCompletionAttachments(task.attachments); track attachment._id) {
+                          <a
+                            [href]="getAttachmentUrl(attachment)"
+                            [download]="attachment.originalName"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 transition hover:border-emerald-300 hover:bg-emerald-100"
+                          >
+                            <div class="flex items-center gap-3 flex-1 min-w-0">
+                              <svg class="h-5 w-5 flex-shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                              </svg>
+                              <div class="flex-1 min-w-0">
+                                <p class="text-xs font-semibold text-slate-700 truncate">{{ attachment.originalName }}</p>
+                                <p class="text-xs text-slate-500">{{ formatFileSize(attachment.size) }}</p>
+                              </div>
+                            </div>
+                            <svg class="h-4 w-4 flex-shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                          </a>
+                        }
+                      </div>
+                    }
+                  } @else {
+                    <p class="text-xs text-slate-400 italic">No attachments</p>
+                  }
                 </div>
-              }
+              </div>
             </div>
           </article>
         }
@@ -955,6 +990,15 @@
                         />
                         Memory Changing
                       </label>
+                      <label class="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 font-semibold uppercase tracking-wide text-slate-600">
+                        <input
+                          type="checkbox"
+                          class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                          [checked]="completeTaskForm().actions.maintenance.betterViewSurvey"
+                          (change)="toggleMaintenanceOption('betterViewSurvey', $any($event.target).checked)"
+                        />
+                        Better View Survey
+                      </label>
                     </div>
 
                     @if (completeTaskForm().actions.maintenance.memoryChanging) {
@@ -1346,6 +1390,140 @@
               {{ completeTaskForm().comment.trim().length }} / {{ completionCommentMin }} chars
             </span>
           </label>
+
+          <div class="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <div>
+              <h3 class="text-sm font-semibold text-slate-900">Attachments</h3>
+              <p class="mt-1 text-xs text-slate-500">
+                Upload photos, documents, or other files related to this task completion.
+              </p>
+            </div>
+
+            @if (completeTaskModal()?.attachments && (completeTaskModal()?.attachments?.length ?? 0) > 0) {
+              <div class="space-y-3">
+                @if (getAssignmentAttachments(completeTaskModal()!.attachments).length > 0) {
+                  <div class="space-y-2">
+                    <p class="text-xs font-semibold text-slate-700">Assignment attachments</p>
+                    @for (attachment of getAssignmentAttachments(completeTaskModal()!.attachments); track attachment._id) {
+                      <a
+                        [href]="getAttachmentUrl(attachment)"
+                        [download]="attachment.originalName"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 transition hover:border-blue-300 hover:bg-blue-100"
+                      >
+                        <div class="flex items-center gap-3 flex-1 min-w-0">
+                          <svg class="h-5 w-5 flex-shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                          </svg>
+                          <div class="flex-1 min-w-0">
+                            <p class="text-xs font-semibold text-slate-700 truncate">{{ attachment.originalName }}</p>
+                            <p class="text-xs text-slate-500">{{ formatFileSize(attachment.size) }}</p>
+                          </div>
+                        </div>
+                        <svg class="h-4 w-4 flex-shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </a>
+                    }
+                  </div>
+                }
+                @if (getCompletionAttachments(completeTaskModal()!.attachments).length > 0) {
+                  <div class="space-y-2">
+                    <p class="text-xs font-semibold text-slate-700">Completion attachments</p>
+                    @for (attachment of getCompletionAttachments(completeTaskModal()!.attachments); track attachment._id) {
+                      <a
+                        [href]="getAttachmentUrl(attachment)"
+                        [download]="attachment.originalName"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 transition hover:border-emerald-300 hover:bg-emerald-100"
+                      >
+                        <div class="flex items-center gap-3 flex-1 min-w-0">
+                          <svg class="h-5 w-5 flex-shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                          </svg>
+                          <div class="flex-1 min-w-0">
+                            <p class="text-xs font-semibold text-slate-700 truncate">{{ attachment.originalName }}</p>
+                            <p class="text-xs text-slate-500">{{ formatFileSize(attachment.size) }}</p>
+                          </div>
+                        </div>
+                        <svg class="h-4 w-4 flex-shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </a>
+                    }
+                  </div>
+                }
+              </div>
+            }
+
+            <div class="space-y-3">
+              <p class="text-xs font-semibold text-slate-700">Add new attachments (optional)</p>
+              <label
+                class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-white p-6 text-sm transition hover:border-indigo-400 hover:bg-indigo-50"
+                [class.opacity-50]="completeTaskForm().isSaving"
+              >
+                <input
+                  type="file"
+                  class="hidden"
+                  #fileInput
+                  multiple
+                  accept="image/*,application/pdf,.doc,.docx,.txt"
+                  (change)="onFileSelected($event)"
+                  [disabled]="completeTaskForm().isSaving"
+                />
+                <svg class="h-8 w-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  />
+                </svg>
+                <span class="font-semibold text-slate-700">Click to upload files</span>
+                <span class="text-xs text-slate-500">Maximum 10MB per file, up to 10 files</span>
+              </label>
+
+              @if (completeTaskForm().selectedFiles && completeTaskForm().selectedFiles.length > 0) {
+                <div class="space-y-2">
+                  @for (file of completeTaskForm().selectedFiles; track file.name + file.size) {
+                    <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                      <div class="flex items-center gap-3">
+                        <svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                        <div class="flex-1">
+                          <p class="text-sm font-semibold text-slate-900">{{ file.name }}</p>
+                          <p class="text-xs text-slate-500">{{ formatFileSize(file.size) }}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        class="rounded-full p-1 text-slate-400 transition hover:text-rose-600"
+                        (click)="removeSelectedFile(file)"
+                        [disabled]="completeTaskForm().isSaving"
+                      >
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
 
           <div class="flex items-center justify-end gap-3">
             <button

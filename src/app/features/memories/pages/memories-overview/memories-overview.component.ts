@@ -375,7 +375,9 @@ export class MemoriesOverviewComponent implements OnInit {
     }
     const role = this.memoryRole();
     const userRole = this.userRole();
-    return role === 'archiver' || userRole === 'Super Admin';
+    const user = this.authStore.user();
+    const canArchiveMemory = (user as any)?.canArchiveMemory ?? false;
+    return role === 'archiver' || userRole === 'Super Admin' || canArchiveMemory;
   }
 
   isUpdating(id: string): boolean {

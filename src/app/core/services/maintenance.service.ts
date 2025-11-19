@@ -60,5 +60,9 @@ export class MaintenanceService {
       ...payload,
     });
   }
+
+  completeTaskWithFiles(id: string, formData: FormData): Observable<Maintenance> {
+    return this.http.put<Maintenance>(`${this.baseUrl}/${id}`, formData);
+  }
 }
 

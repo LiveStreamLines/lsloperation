@@ -179,6 +179,7 @@
             selectedCameraStatus() === 'maintenance_long_time' ||
             selectedCameraStatus() === 'maintenance_less_images' ||
             selectedCameraStatus() === 'maintenance_photo_dirty' ||
+            selectedCameraStatus() === 'maintenance_better_view' ||
             selectedCameraStatus() === 'device_expired' ||
             selectedCameraStatus() === 'memory_full'
           ) {
@@ -233,6 +234,18 @@
                 (click)="onStatusSelect('maintenance_photo_dirty')"
               >
                 Photo dirty
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition"
+                [ngClass]="
+                  selectedCameraStatus() === 'maintenance_better_view'
+                    ? 'border-indigo-500 bg-indigo-500 text-white'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                "
+                (click)="onStatusSelect('maintenance_better_view')"
+              >
+                Better view
               </button>
               <button
                 type="button"
@@ -332,27 +345,6 @@
         </div>
       </label>
 
-      <div class="flex flex-wrap items-center gap-2 md:col-span-2 xl:col-span-1">
-        <span class="text-sm font-semibold text-slate-700">Sort by</span>
-        <div class="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1 text-xs font-semibold uppercase tracking-wide">
-          <button
-            type="button"
-            class="rounded-full px-3 py-1 transition"
-            [ngClass]="sortMode() === 'developer' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500'"
-            (click)="onSortChange('developer')"
-          >
-            Developer / project
-          </button>
-          <button
-            type="button"
-            class="rounded-full px-3 py-1 transition"
-            [ngClass]="sortMode() === 'server' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500'"
-            (click)="onSortChange('server')"
-          >
-            Server
-          </button>
-        </div>
-      </div>
     </div>
 
     <div class="mt-6 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
@@ -517,7 +509,40 @@
                               </span>
                             }
                             @if (camera.maintenanceStatusPhotoDirty) {
-                              <!-- Photo dirty status is shown via pills near the main status and filters -->
+                              <span
+                                class="inline-flex items-center rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700"
+                              >
+                                Photo dirty
+                                @if (camera.photoDirtyMarkedBy || camera.photoDirtyMarkedAt) {
+                                  <span class="ml-1.5 text-[9px] normal-case text-rose-600">
+                                    @if (camera.photoDirtyMarkedBy && camera.photoDirtyMarkedAt) {
+                                      by {{ camera.photoDirtyMarkedBy }} on {{ camera.photoDirtyMarkedAt | date: 'short' }}
+                                    } @else if (camera.photoDirtyMarkedBy) {
+                                      by {{ camera.photoDirtyMarkedBy }}
+                                    } @else if (camera.photoDirtyMarkedAt) {
+                                      on {{ camera.photoDirtyMarkedAt | date: 'short' }}
+                                    }
+                                  </span>
+                                }
+                              </span>
+                            }
+                            @if (camera.maintenanceStatusBetterView) {
+                              <span
+                                class="inline-flex items-center rounded-full border border-indigo-300 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700"
+                              >
+                                Better view
+                                @if (camera.betterViewMarkedBy || camera.betterViewMarkedAt) {
+                                  <span class="ml-1.5 text-[9px] normal-case text-indigo-600">
+                                    @if (camera.betterViewMarkedBy && camera.betterViewMarkedAt) {
+                                      by {{ camera.betterViewMarkedBy }} on {{ camera.betterViewMarkedAt | date: 'short' }}
+                                    } @else if (camera.betterViewMarkedBy) {
+                                      by {{ camera.betterViewMarkedBy }}
+                                    } @else if (camera.betterViewMarkedAt) {
+                                      on {{ camera.betterViewMarkedAt | date: 'short' }}
+                                    }
+                                  </span>
+                                }
+                              </span>
                             }
                             <span class="text-[10px] uppercase tracking-wide text-slate-400">{{ lastUpdateLabel(camera) }}</span>
                           </div>
@@ -563,24 +588,92 @@
                             <dt class="font-semibold text-slate-700">Last update</dt>
                             <dd>{{ camera.lastUpdatedAt ? (camera.lastUpdatedAt | date: 'medium') : 'Not available' }}</dd>
                           </div>
+                          @if (camera.photoDirtyRemovedBy || camera.photoDirtyRemovedAt) {
+                            <div class="flex items-center justify-between">
+                              <dt class="font-semibold text-slate-700">Photo dirty removed</dt>
+                              <dd class="text-xs text-slate-500">
+                                @if (camera.photoDirtyRemovedBy && camera.photoDirtyRemovedAt) {
+                                  by {{ camera.photoDirtyRemovedBy }} on {{ camera.photoDirtyRemovedAt | date: 'short' }}
+                                } @else if (camera.photoDirtyRemovedBy) {
+                                  by {{ camera.photoDirtyRemovedBy }}
+                                } @else if (camera.photoDirtyRemovedAt) {
+                                  on {{ camera.photoDirtyRemovedAt | date: 'short' }}
+                                }
+                              </dd>
+                            </div>
+                          }
+                          @if (camera.betterViewRemovedBy || camera.betterViewRemovedAt) {
+                            <div class="flex items-center justify-between">
+                              <dt class="font-semibold text-slate-700">Better view removed</dt>
+                              <dd class="text-xs text-slate-500">
+                                @if (camera.betterViewRemovedBy && camera.betterViewRemovedAt) {
+                                  by {{ camera.betterViewRemovedBy }} on {{ camera.betterViewRemovedAt | date: 'short' }}
+                                } @else if (camera.betterViewRemovedBy) {
+                                  by {{ camera.betterViewRemovedBy }}
+                                } @else if (camera.betterViewRemovedAt) {
+                                  on {{ camera.betterViewRemovedAt | date: 'short' }}
+                                }
+                              </dd>
+                            </div>
+                          }
                         </dl>
 
                         @if (isSuperAdmin()) {
                           <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
-                            <button
-                              type="button"
-                              class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
-                              [ngClass]="
-                                !camera.cameraStatusRaw
-                                  ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-200/40'
-                                  : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-600'
-                              "
-                              (click)="clearCameraStatus(camera)"
-                              [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
-                            >
-                              Active
-                            </button>
-                            @if (camera.status !== 'online' && (isSuperAdmin() || canHoldTask())) {
+                            <!-- Active button - always shown except for online -->
+                            @if (camera.status !== 'online') {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  !camera.cameraStatusRaw
+                                    ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-600'
+                                "
+                                (click)="clearCameraStatus(camera)"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Active
+                              </button>
+                            }
+                            <!-- Photo dirty button - only for online (100% health) and maintenance -->
+                            @if (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time') {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  camera.maintenanceStatusPhotoDirty
+                                    ? 'border-rose-500 bg-rose-500 text-white shadow-lg shadow-rose-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover-border-rose-300 hover:text-rose-600'
+                                "
+                                (click)="togglePhotoDirty(camera)"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Photo dirty
+                              </button>
+                            }
+                            <!-- Better view button - only for online (100% health) and maintenance -->
+                            @if (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time') {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  camera.maintenanceStatusBetterView
+                                    ? 'border-indigo-500 bg-indigo-500 text-white shadow-lg shadow-indigo-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover-border-indigo-300 hover:text-indigo-600'
+                                "
+                                (click)="toggleBetterView(camera)"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Better view
+                              </button>
+                            }
+                            <!-- Hold button - for offline and maintenance -->
+                            @if (
+                              (camera.status === 'offline' || camera.status === 'offline_hold' || camera.status === 'offline_network' || 
+                               camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time') &&
+                              (isSuperAdmin() || canHoldTask())
+                            ) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -595,62 +688,40 @@
                                 Hold
                               </button>
                             }
-                            @if (isSuperAdmin()) {
-                              @if (
-                                camera.status !== 'offline' &&
-                                camera.status !== 'offline_hold' &&
-                                camera.status !== 'offline_network' &&
-                                camera.status !== 'finished'
-                              ) {
-                                <button
-                                  type="button"
-                                  class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
-                                  [ngClass]="
-                                    camera.maintenanceStatusPhotoDirty
-                                      ? 'border-rose-500 bg-rose-500 text-white shadow-lg shadow-rose-200/40'
-                                      : 'border-slate-200 bg-white text-slate-600 hover-border-rose-300 hover:text-rose-600'
-                                  "
-                                  (click)="togglePhotoDirty(camera)"
-                                  [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
-                                >
-                                  Photo dirty
-                                </button>
-                              }
-                              @if (
-                                camera.status !== 'maintenance' &&
-                                camera.status !== 'maintenance_hold' &&
-                                camera.status !== 'maintenance_long_time' &&
-                                (isSuperAdmin() || canHoldTask())
-                              ) {
-                                <button
-                                  type="button"
-                                  class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
-                                  [ngClass]="
-                                    isCameraStatus(camera, 'network')
-                                      ? 'border-sky-500 bg-sky-500 text-white shadow-lg shadow-sky-200/40'
-                                      : 'border-slate-200 bg-white text-slate-600 hover-border-sky-300 hover:text-sky-600'
-                                  "
-                                  (click)="toggleCameraStatus(camera, 'network')"
-                                  [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
-                                >
-                                  Network
-                                </button>
-                              }
-                              @if (camera.status !== 'online') {
-                                <button
-                                  type="button"
-                                  class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
-                                  [ngClass]="
-                                    isCameraStatus(camera, 'finished')
-                                      ? 'border-slate-500 bg-slate-500 text-white shadow-lg shadow-slate-200/40'
-                                      : 'border-slate-200 bg-white text-slate-600 hover-border-slate-400 hover:text-slate-700'
-                                  "
-                                  (click)="toggleCameraStatus(camera, 'finished')"
-                                  [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
-                                >
-                                  Finished
-                                </button>
-                              }
+                            <!-- Network button - only for offline -->
+                            @if (
+                              (camera.status === 'offline' || camera.status === 'offline_hold' || camera.status === 'offline_network') &&
+                              (isSuperAdmin() || canHoldTask())
+                            ) {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  isCameraStatus(camera, 'network')
+                                    ? 'border-sky-500 bg-sky-500 text-white shadow-lg shadow-sky-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover-border-sky-300 hover:text-sky-600'
+                                "
+                                (click)="toggleCameraStatus(camera, 'network')"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Network
+                              </button>
+                            }
+                            <!-- Finished button - for offline and finished -->
+                            @if (camera.status === 'offline' || camera.status === 'offline_hold' || camera.status === 'offline_network' || camera.status === 'finished') {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  isCameraStatus(camera, 'finished')
+                                    ? 'border-slate-500 bg-slate-500 text-white shadow-lg shadow-slate-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover-border-slate-400 hover:text-slate-700'
+                                "
+                                (click)="toggleCameraStatus(camera, 'finished')"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Finished
+                              </button>
                             }
                             @if (isCameraStatusUpdating(camera.id)) {
                               <span class="inline-flex h-2.5 w-2.5 animate-spin rounded-full border border-slate-300 border-t-indigo-500"></span>
@@ -809,7 +880,40 @@
                   </span>
                 }
                 @if (camera.maintenanceStatusPhotoDirty) {
-                  <!-- Photo dirty status is shown via pills near the main status and filters -->
+                  <span
+                    class="inline-flex items-center rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700"
+                  >
+                    Photo dirty
+                    @if (camera.photoDirtyMarkedBy || camera.photoDirtyMarkedAt) {
+                      <span class="ml-1.5 text-[9px] normal-case text-rose-600">
+                        @if (camera.photoDirtyMarkedBy && camera.photoDirtyMarkedAt) {
+                          by {{ camera.photoDirtyMarkedBy }} on {{ camera.photoDirtyMarkedAt | date: 'short' }}
+                        } @else if (camera.photoDirtyMarkedBy) {
+                          by {{ camera.photoDirtyMarkedBy }}
+                        } @else if (camera.photoDirtyMarkedAt) {
+                          on {{ camera.photoDirtyMarkedAt | date: 'short' }}
+                        }
+                      </span>
+                    }
+                  </span>
+                }
+                @if (camera.maintenanceStatusBetterView) {
+                  <span
+                    class="inline-flex items-center rounded-full border border-indigo-300 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700"
+                  >
+                    Better view
+                    @if (camera.betterViewMarkedBy || camera.betterViewMarkedAt) {
+                      <span class="ml-1.5 text-[9px] normal-case text-indigo-600">
+                        @if (camera.betterViewMarkedBy && camera.betterViewMarkedAt) {
+                          by {{ camera.betterViewMarkedBy }} on {{ camera.betterViewMarkedAt | date: 'short' }}
+                        } @else if (camera.betterViewMarkedBy) {
+                          by {{ camera.betterViewMarkedBy }}
+                        } @else if (camera.betterViewMarkedAt) {
+                          on {{ camera.betterViewMarkedAt | date: 'short' }}
+                        }
+                      </span>
+                    }
+                  </span>
                 }
                 <span class="text-[10px] uppercase tracking-wide text-slate-400">{{ lastUpdateLabel(camera) }}</span>
               </div>
@@ -841,23 +945,91 @@
                 <dt class="font-semibold text-slate-700">Last update</dt>
                 <dd>{{ camera.lastUpdatedAt ? (camera.lastUpdatedAt | date: 'medium') : 'Not available' }}</dd>
               </div>
+              @if (camera.photoDirtyRemovedBy || camera.photoDirtyRemovedAt) {
+                <div class="flex items-center justify-between">
+                  <dt class="font-semibold text-slate-700">Photo dirty removed</dt>
+                  <dd class="text-xs text-slate-500">
+                    @if (camera.photoDirtyRemovedBy && camera.photoDirtyRemovedAt) {
+                      by {{ camera.photoDirtyRemovedBy }} on {{ camera.photoDirtyRemovedAt | date: 'short' }}
+                    } @else if (camera.photoDirtyRemovedBy) {
+                      by {{ camera.photoDirtyRemovedBy }}
+                    } @else if (camera.photoDirtyRemovedAt) {
+                      on {{ camera.photoDirtyRemovedAt | date: 'short' }}
+                    }
+                  </dd>
+                </div>
+              }
+              @if (camera.betterViewRemovedBy || camera.betterViewRemovedAt) {
+                <div class="flex items-center justify-between">
+                  <dt class="font-semibold text-slate-700">Better view removed</dt>
+                  <dd class="text-xs text-slate-500">
+                    @if (camera.betterViewRemovedBy && camera.betterViewRemovedAt) {
+                      by {{ camera.betterViewRemovedBy }} on {{ camera.betterViewRemovedAt | date: 'short' }}
+                    } @else if (camera.betterViewRemovedBy) {
+                      by {{ camera.betterViewRemovedBy }}
+                    } @else if (camera.betterViewRemovedAt) {
+                      on {{ camera.betterViewRemovedAt | date: 'short' }}
+                    }
+                  </dd>
+                </div>
+              }
             </dl>
                         @if (isSuperAdmin()) {
                           <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
-                            <button
-                              type="button"
-                              class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
-                              [ngClass]="
-                                !camera.cameraStatusRaw
-                                  ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-200/40'
-                                  : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-600'
-                              "
-                              (click)="clearCameraStatus(camera)"
-                              [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
-                            >
-                              Active
-                            </button>
-                            @if (camera.status !== 'online' && (isSuperAdmin() || canHoldTask())) {
+                            <!-- Active button - always shown except for online -->
+                            @if (camera.status !== 'online') {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  !camera.cameraStatusRaw
+                                    ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-600'
+                                "
+                                (click)="clearCameraStatus(camera)"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Active
+                              </button>
+                            }
+                            <!-- Photo dirty button - only for online (100% health) and maintenance -->
+                            @if (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time') {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  camera.maintenanceStatusPhotoDirty
+                                    ? 'border-rose-500 bg-rose-500 text-white shadow-lg shadow-rose-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover-border-rose-300 hover:text-rose-600'
+                                "
+                                (click)="togglePhotoDirty(camera)"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Photo dirty
+                              </button>
+                            }
+                            <!-- Better view button - only for online (100% health) and maintenance -->
+                            @if (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time') {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  camera.maintenanceStatusBetterView
+                                    ? 'border-indigo-500 bg-indigo-500 text-white shadow-lg shadow-indigo-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover-border-indigo-300 hover:text-indigo-600'
+                                "
+                                (click)="toggleBetterView(camera)"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Better view
+                              </button>
+                            }
+                            <!-- Hold button - for offline and maintenance -->
+                            @if (
+                              (camera.status === 'offline' || camera.status === 'offline_hold' || camera.status === 'offline_network' || 
+                               camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time') &&
+                              (isSuperAdmin() || canHoldTask())
+                            ) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -872,7 +1044,11 @@
                                 Hold
                               </button>
                             }
-                            @if (camera.status !== 'maintenance' && camera.status !== 'maintenance_hold' && camera.status !== 'maintenance_long_time' && (isSuperAdmin() || canHoldTask())) {
+                            <!-- Network button - only for offline -->
+                            @if (
+                              (camera.status === 'offline' || camera.status === 'offline_hold' || camera.status === 'offline_network') &&
+                              (isSuperAdmin() || canHoldTask())
+                            ) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -887,7 +1063,8 @@
                                 Network
                               </button>
                             }
-                            @if (camera.status !== 'online') {
+                            <!-- Finished button - for offline and finished -->
+                            @if (camera.status === 'offline' || camera.status === 'offline_hold' || camera.status === 'offline_network' || camera.status === 'finished') {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"

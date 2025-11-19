@@ -9,6 +9,7 @@ export interface MaintenanceAttachment {
   url: string;
   uploadedAt: string;
   uploadedBy?: string;
+  context?: 'assignment' | 'completion'; // When the attachment was uploaded
 }
 
 export interface Maintenance {
@@ -59,5 +60,6 @@ export const LEGACY_TASK_TYPES: readonly string[] = [
   'Removal',
   'Installation',
   'Reinstallation',
+  'Better View Survey',
 ];
 

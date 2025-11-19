@@ -165,7 +165,7 @@ export class CameraService {
 
   updateMaintenanceStatus(
     cameraId: string,
-    payload: { photoDirty?: boolean; lowImages?: boolean },
+    payload: { photoDirty?: boolean; lowImages?: boolean; betterView?: boolean },
   ): Observable<Camera> {
     return this.http.put<Camera>(`${this.baseUrl}/${cameraId}/maintenance-status`, payload).pipe(
       tap(() => {

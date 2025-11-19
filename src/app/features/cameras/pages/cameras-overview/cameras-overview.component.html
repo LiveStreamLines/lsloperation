@@ -43,16 +43,34 @@
         </label>
       }
 
-      <button
-        type="button"
-        class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-        (click)="openAddCamera()"
-      >
-        <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
-          <path d="M10.5 4a.5.5 0 10-1 0v5.5H4a.5.5 0 000 1h5.5V16a.5.5 0 001 0v-5.5H16a.5.5 0 000-1h-5.5V4z" />
-        </svg>
-        Add New
-      </button>
+      @if (countryOptions().length > 0) {
+        <label class="flex flex-col gap-2 text-sm text-slate-600">
+          <span class="font-semibold text-slate-800">Select Country</span>
+          <select
+            class="w-64 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            [value]="selectedCountry() ?? ''"
+            (change)="onCountryChange($any($event.target).value)"
+          >
+            <option value="">All countries</option>
+            @for (country of countryOptions(); track country) {
+              <option [value]="country">{{ country }}</option>
+            }
+          </select>
+        </label>
+      }
+
+      @if (!hasCameraConfigurationPermission()) {
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+          (click)="openAddCamera()"
+        >
+          <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
+            <path d="M10.5 4a.5.5 0 10-1 0v5.5H4a.5.5 0 000 1h5.5V16a.5.5 0 001 0v-5.5H16a.5.5 0 000-1h-5.5V4z" />
+          </svg>
+          Add New
+        </button>
+      }
     </div>
 
     <label class="flex flex-col gap-2 text-sm text-slate-600">
@@ -98,10 +116,10 @@
               <th class="px-6 py-3">Country</th>
               <th class="px-6 py-3">Server Folder</th>
               <th class="px-6 py-3">Created Date</th>
-              <th class="px-6 py-3">Installation Date</th>
-              <th class="px-6 py-3">Status</th>
-              <th class="px-6 py-3">Block/Unblock</th>
-              <th class="px-6 py-3 text-right">Actions</th>
+              @if (!hasCameraConfigurationPermission()) {
+                <th class="px-6 py-3">Block/Unblock</th>
+                <th class="px-6 py-3 text-right">Actions</th>
+              }
               <th class="px-6 py-3 text-right">Download</th>
             </tr>
           </thead>
@@ -126,45 +144,36 @@
                 <td class="px-6 py-4 text-sm text-slate-600">{{ camera.country || '—' }}</td>
                 <td class="px-6 py-4 text-sm text-slate-600">{{ camera.serverFolder || '—' }}</td>
                 <td class="px-6 py-4 text-sm text-slate-600">{{ formatDate(camera.createdDate) }}</td>
-                <td class="px-6 py-4 text-sm text-slate-600">
-                  {{ camera.installedDate ? formatDate(camera.installedDate) : 'Not Installed' }}
-                </td>
-                <td class="px-6 py-4">
-                  <span
-                    class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
-                    [class]="getStatusBadgeClass(camera.status)"
-                  >
-                    {{ camera.status || 'Pending' }}
-                  </span>
-                </td>
-                <td class="px-6 py-4">
-                  <button
-                    type="button"
-                    class="rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                    [class.bg-rose-600]="camera.blocked"
-                    [class.border-rose-600]="camera.blocked"
-                    [class.text-white]="camera.blocked"
-                    [class.hover:bg-rose-700]="camera.blocked"
-                    (click)="toggleBlockStatus(camera)"
-                  >
-                    {{ camera.blocked ? 'Unblock' : 'Block' }}
-                  </button>
-                </td>
-                <td class="px-6 py-4 text-right">
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1 rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    (click)="openEditCamera(camera._id)"
-                    [disabled]="camera.blocked"
-                  >
-                    <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
-                      <path
-                        d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 1a7 7 0 110 14 7 7 0 010-14zm0 2a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 000-2H11V5a1 1 0 00-1-1z"
-                      />
-                    </svg>
-                    Edit
-                  </button>
-                </td>
+                @if (!hasCameraConfigurationPermission()) {
+                  <td class="px-6 py-4">
+                    <button
+                      type="button"
+                      class="rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                      [class.bg-rose-600]="camera.blocked"
+                      [class.border-rose-600]="camera.blocked"
+                      [class.text-white]="camera.blocked"
+                      [class.hover:bg-rose-700]="camera.blocked"
+                      (click)="toggleBlockStatus(camera)"
+                    >
+                      {{ camera.blocked ? 'Unblock' : 'Block' }}
+                    </button>
+                  </td>
+                  <td class="px-6 py-4 text-right">
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-1 rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      (click)="openEditCamera(camera._id)"
+                      [disabled]="camera.blocked"
+                    >
+                      <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
+                        <path
+                          d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 1a7 7 0 110 14 7 7 0 010-14zm0 2a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 000-2H11V5a1 1 0 00-1-1z"
+                        />
+                      </svg>
+                      Edit
+                    </button>
+                  </td>
+                }
                 <td class="px-6 py-4 text-right">
                   <button
                     type="button"

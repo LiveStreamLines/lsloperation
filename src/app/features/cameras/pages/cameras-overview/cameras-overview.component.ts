@@ -11,6 +11,7 @@ import { ProjectService } from '@core/services/project.service';
 import { Camera } from '@core/models/camera.model';
 import { Developer } from '@core/models/developer.model';
 import { Project } from '@core/models/project.model';
+import { AuthStore } from '@core/auth/auth.store';
 
 @Component({
   selector: 'app-cameras-overview',
@@ -24,6 +25,7 @@ export class CamerasOverviewComponent implements OnInit {
   private readonly projectService = inject(ProjectService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly authStore = inject(AuthStore);
 
   readonly isLoading = signal(true);
   readonly errorMessage = signal<string | null>(null);
@@ -32,6 +34,7 @@ export class CamerasOverviewComponent implements OnInit {
   readonly projects = signal<Project[]>([]);
   readonly selectedDeveloperId = signal<string | null>(null);
   readonly selectedProjectId = signal<string | null>(null);
+  readonly selectedCountry = signal<string | null>(null);
   readonly searchTerm = signal('');
 
   readonly sortedDevelopers = computed(() => {
@@ -50,10 +53,31 @@ export class CamerasOverviewComponent implements OnInit {
     });
   });
 
+  readonly countryOptions = computed(() => {
+    const countries = new Set<string>();
+    for (const camera of this.cameras()) {
+      const country = (camera.country || '').trim();
+      if (country) {
+        countries.add(country);
+      }
+    }
+    return Array.from(countries).sort((a, b) => a.localeCompare(b));
+  });
+
   readonly filteredCameras = computed(() => {
     const term = this.searchTerm().toLowerCase().trim();
-    const cameras = this.cameras();
-    
+    const selectedCountry = this.selectedCountry();
+    let cameras = this.cameras();
+
+    // Filter by country first
+    if (selectedCountry) {
+      cameras = cameras.filter((camera) => {
+        const cameraCountry = (camera.country || '').trim();
+        return cameraCountry === selectedCountry;
+      });
+    }
+
+    // Then filter by search term
     if (!term) {
       return cameras;
     }
@@ -80,10 +104,29 @@ export class CamerasOverviewComponent implements OnInit {
     // 1. "All developers" is selected, OR
     // 2. A developer is selected but no project is selected
     // Hide them only when both developer AND project are selected
+    // Temporarily hiding 'installedDate' and 'status' columns for all users
+    const hasCameraConfigPermission = this.hasCameraConfigurationPermission();
+    const baseColumns = ['name', 'country', 'serverFolder', 'createdDate', 'download'];
+    
     if (this.selectedDeveloperId() && this.selectedProjectId()) {
-      return ['name', 'country', 'serverFolder', 'createdDate', 'installedDate', 'status', 'blockUnblock', 'actions', 'download'];
+      if (hasCameraConfigPermission) {
+        return baseColumns;
+      }
+      return [...baseColumns, 'blockUnblock', 'actions'];
     }
-    return ['name', 'developer', 'project', 'country', 'serverFolder', 'createdDate', 'installedDate', 'status', 'blockUnblock', 'actions', 'download'];
+    
+    const withDevProj = ['name', 'developer', 'project', ...baseColumns];
+    if (hasCameraConfigPermission) {
+      return withDevProj;
+    }
+    return [...withDevProj, 'blockUnblock', 'actions'];
+  });
+
+  readonly hasCameraConfigurationPermission = computed(() => {
+    const user = this.authStore.user();
+    if (!user) return false;
+    const canManageDevProjCam = (user as any).canManageDevProjCam;
+    return canManageDevProjCam === 'camera_configuration';
   });
 
   ngOnInit(): void {
@@ -237,6 +280,10 @@ export class CamerasOverviewComponent implements OnInit {
 
   onSearchChange(term: string): void {
     this.searchTerm.set(term);
+  }
+
+  onCountryChange(country: string): void {
+    this.selectedCountry.set(country || null);
   }
 
   getDeveloperName(developer: string | { _id?: string; developerName?: string }): string {

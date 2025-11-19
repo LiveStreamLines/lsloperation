@@ -29,6 +29,7 @@ import { ProjectService } from '@core/services/project.service';
 import { User } from '@core/models/user.model';
 import { UserService } from '@core/services/user.service';
 import {
+  LEGACY_TASK_TYPES,
   Maintenance,
   MaintenanceCreateRequest,
   MaintenanceStatus,
@@ -46,7 +47,7 @@ type CameraStatus =
   | 'maintenance_long_time'
   | 'finished';
 
-type CameraStatusFilter = 'all' | CameraStatus | 'maintenance_less_images' | 'maintenance_photo_dirty' | 'device_expired' | 'memory_full';
+type CameraStatusFilter = 'all' | CameraStatus | 'maintenance_less_images' | 'maintenance_photo_dirty' | 'maintenance_better_view' | 'device_expired' | 'memory_full';
 
 interface CountryOption {
   value: string;
@@ -76,6 +77,15 @@ interface CameraViewModel {
   // Maintenance-related flags
   maintenanceLowImages?: boolean;
   maintenanceStatusPhotoDirty?: boolean;
+  photoDirtyMarkedBy?: string;
+  photoDirtyMarkedAt?: string;
+  photoDirtyRemovedBy?: string;
+  photoDirtyRemovedAt?: string;
+  maintenanceStatusBetterView?: boolean;
+  betterViewMarkedBy?: string;
+  betterViewMarkedAt?: string;
+  betterViewRemovedBy?: string;
+  betterViewRemovedAt?: string;
   maintenanceStatusLowImages?: boolean;
   lastMaintenanceCompletedAt?: Date | null;
 }
@@ -135,13 +145,6 @@ const MAINTENANCE_THRESHOLD_DAYS = 30;
 const FILTER_STORAGE_KEY = 'camera-monitor-filters';
 const NO_COUNTRY_VALUE = '__no_country__';
 const ALLOWED_COUNTRIES = ['Saudi Arabia', 'UAE'] as const;
-const LEGACY_TASK_TYPES = [
-  'break down',
-  'Maintenance',
-  'Removal',
-  'Installation',
-  'Reinstallation',
-] as const;
 
 @Component({
   selector: 'app-camera-monitor',
@@ -219,7 +222,7 @@ export class CameraMonitorComponent implements OnInit {
   readonly cameraCountryUpdating = signal<Set<string>>(new Set());
   readonly cameraHealthData = signal<Map<string, CameraHealthResponse | null>>(new Map());
 
-  readonly taskTypes = LEGACY_TASK_TYPES;
+  readonly taskTypes = [...LEGACY_TASK_TYPES];
 
   readonly cameraStatusOptions: Array<{ value: CameraStatusFilter; label: string }> = [
     { value: 'all', label: 'All statuses' },
@@ -280,7 +283,7 @@ export class CameraMonitorComponent implements OnInit {
     const countryFilter = this.selectedCountry();
     const statusFilter = this.selectedCameraStatus();
     const search = this.searchTerm().trim().toLowerCase();
-    const sort = this.sortMode();
+    // Always sort by developer/project/name
     const isSuperAdmin = this.isSuperAdmin();
     const accessible = this.accessibleDevelopers();
 
@@ -331,30 +334,19 @@ export class CameraMonitorComponent implements OnInit {
       });
     }
 
+    // Always sort by developer/project/name
     const sorted = [...list];
-    if (sort === 'developer') {
-      sorted.sort((a, b) => {
-        const dev = a.developerName.localeCompare(b.developerName);
-        if (dev !== 0) {
-          return dev;
-        }
-        const proj = a.projectName.localeCompare(b.projectName);
-        if (proj !== 0) {
-          return proj;
-        }
-        return a.name.localeCompare(b.name);
-      });
-    } else {
-      sorted.sort((a, b) => {
-        const serverA = (a.serverFolder ?? '').toLowerCase();
-        const serverB = (b.serverFolder ?? '').toLowerCase();
-        const serverCompare = serverA.localeCompare(serverB);
-        if (serverCompare !== 0) {
-          return serverCompare;
-        }
-        return a.name.localeCompare(b.name);
-      });
-    }
+    sorted.sort((a, b) => {
+      const dev = a.developerName.localeCompare(b.developerName);
+      if (dev !== 0) {
+        return dev;
+      }
+      const proj = a.projectName.localeCompare(b.projectName);
+      if (proj !== 0) {
+        return proj;
+      }
+      return a.name.localeCompare(b.name);
+    });
 
     return sorted;
   });
@@ -467,7 +459,6 @@ export class CameraMonitorComponent implements OnInit {
     if (this.selectedCountry()) count += 1;
     if (this.selectedCameraStatus() !== 'all') count += 1;
     if (this.searchTerm().trim().length > 0) count += 1;
-    if (this.sortMode() !== 'developer') count += 1;
     return count;
   });
 
@@ -480,7 +471,6 @@ export class CameraMonitorComponent implements OnInit {
         projectId: this.selectedProjectId(),
         country: this.selectedCountry(),
         status: this.selectedCameraStatus(),
-        sortMode: this.sortMode(),
         search: this.searchTerm(),
       };
       try {
@@ -518,9 +508,6 @@ export class CameraMonitorComponent implements OnInit {
     this.selectedCameraStatus.set(value);
   }
 
-  onSortChange(mode: SortMode): void {
-    this.sortMode.set(mode);
-  }
 
   onSearch(value: string): void {
     this.searchTerm.set(value);
@@ -581,7 +568,7 @@ export class CameraMonitorComponent implements OnInit {
     this.selectedProjectId.set(null);
     this.selectedCountry.set(null);
     this.selectedCameraStatus.set('all');
-    this.sortMode.set('developer');
+    // sortMode is always 'developer', no need to reset
     this.searchTerm.set('');
   }
 
@@ -704,6 +691,15 @@ export class CameraMonitorComponent implements OnInit {
         const maintenanceStatus = (updated.maintenanceStatus ?? {}) as {
           photoDirty?: boolean;
           lowImages?: boolean;
+          betterView?: boolean;
+          photoDirtyMarkedBy?: string;
+          photoDirtyMarkedAt?: string;
+          photoDirtyRemovedBy?: string;
+          photoDirtyRemovedAt?: string;
+          betterViewMarkedBy?: string;
+          betterViewMarkedAt?: string;
+          betterViewRemovedBy?: string;
+          betterViewRemovedAt?: string;
         };
 
         this.cameraRecords.update((list) =>
@@ -729,6 +725,10 @@ export class CameraMonitorComponent implements OnInit {
                     cameraStatusRaw: updatedStatusRaw,
                     status: derivedStatus,
                     maintenanceStatusPhotoDirty: isPhotoDirty,
+                    photoDirtyMarkedBy: maintenanceStatus.photoDirtyMarkedBy,
+                    photoDirtyMarkedAt: maintenanceStatus.photoDirtyMarkedAt,
+                    photoDirtyRemovedBy: maintenanceStatus.photoDirtyRemovedBy,
+                    photoDirtyRemovedAt: maintenanceStatus.photoDirtyRemovedAt,
                     camera: { ...item.camera, maintenanceStatus },
                   };
                 })()
@@ -738,6 +738,79 @@ export class CameraMonitorComponent implements OnInit {
 
         this.showToast(
           maintenanceStatus.photoDirty ? 'Marked as photo dirty.' : 'Photo dirty status cleared.',
+          'success',
+        );
+      });
+  }
+
+  toggleBetterView(camera: CameraViewModel): void {
+    const nextValue = !camera.maintenanceStatusBetterView;
+
+    this.cameraService
+      .updateMaintenanceStatus(camera.id, { betterView: nextValue })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        catchError((error) => {
+          console.error('Failed to update better view status', error);
+          this.showToast('Unable to update better view status.', 'error');
+          return of<Camera | null>(null);
+        }),
+      )
+      .subscribe((updated) => {
+        if (!updated) {
+          return;
+        }
+
+        const maintenanceStatus = (updated.maintenanceStatus ?? {}) as {
+          photoDirty?: boolean;
+          lowImages?: boolean;
+          betterView?: boolean;
+          photoDirtyMarkedBy?: string;
+          photoDirtyMarkedAt?: string;
+          photoDirtyRemovedBy?: string;
+          photoDirtyRemovedAt?: string;
+          betterViewMarkedBy?: string;
+          betterViewMarkedAt?: string;
+          betterViewRemovedBy?: string;
+          betterViewRemovedAt?: string;
+        };
+
+        this.cameraRecords.update((list) =>
+          list.map((item) =>
+            item.id === camera.id
+              ? (() => {
+                  const isBetterView = !!maintenanceStatus.betterView;
+                  const projectStatusNormalized = this.normalizeProjectStatus(item.projectStatus);
+                  const updatedStatusRaw = this.normalizeCameraStatusRaw(
+                    item.camera.status as string | undefined,
+                  );
+                  const health = this.cameraHealthData().get(item.id) ?? null;
+                  const derivedStatus = this.deriveCameraStatus(
+                    projectStatusNormalized,
+                    updatedStatusRaw,
+                    item.lastUpdatedAt,
+                    health,
+                    item.maintenanceStatusPhotoDirty ?? false,
+                    item.lastMaintenanceCompletedAt ?? null,
+                  );
+                  return {
+                    ...item,
+                    cameraStatusRaw: updatedStatusRaw,
+                    status: derivedStatus,
+                    maintenanceStatusBetterView: isBetterView,
+                    betterViewMarkedBy: maintenanceStatus.betterViewMarkedBy,
+                    betterViewMarkedAt: maintenanceStatus.betterViewMarkedAt,
+                    betterViewRemovedBy: maintenanceStatus.betterViewRemovedBy,
+                    betterViewRemovedAt: maintenanceStatus.betterViewRemovedAt,
+                    camera: { ...item.camera, maintenanceStatus },
+                  };
+                })()
+              : item,
+          ),
+        );
+
+        this.showToast(
+          maintenanceStatus.betterView ? 'Marked as better view.' : 'Better view status cleared.',
           'success',
         );
       });
@@ -1454,10 +1527,19 @@ export class CameraMonitorComponent implements OnInit {
       const health = healthData?.get(camera._id) ?? null;
       const maintenanceLowImages = !!(health && !health.error && health.totalImages < 140);
       const maintenanceStatus = camera.maintenanceStatus as
-        | { photoDirty?: boolean; lowImages?: boolean }
+        | { photoDirty?: boolean; lowImages?: boolean; betterView?: boolean; photoDirtyMarkedBy?: string; photoDirtyMarkedAt?: string; photoDirtyRemovedBy?: string; photoDirtyRemovedAt?: string; betterViewMarkedBy?: string; betterViewMarkedAt?: string; betterViewRemovedBy?: string; betterViewRemovedAt?: string }
         | undefined;
       const maintenanceStatusPhotoDirty = !!maintenanceStatus?.photoDirty;
       const maintenanceStatusLowImages = !!maintenanceStatus?.lowImages;
+      const maintenanceStatusBetterView = !!maintenanceStatus?.betterView;
+      const photoDirtyMarkedBy = maintenanceStatus?.photoDirtyMarkedBy;
+      const photoDirtyMarkedAt = maintenanceStatus?.photoDirtyMarkedAt;
+      const photoDirtyRemovedBy = maintenanceStatus?.photoDirtyRemovedBy;
+      const photoDirtyRemovedAt = maintenanceStatus?.photoDirtyRemovedAt;
+      const betterViewMarkedBy = maintenanceStatus?.betterViewMarkedBy;
+      const betterViewMarkedAt = maintenanceStatus?.betterViewMarkedAt;
+      const betterViewRemovedBy = maintenanceStatus?.betterViewRemovedBy;
+      const betterViewRemovedAt = maintenanceStatus?.betterViewRemovedAt;
       const lastMaintenanceCompletedAt = maintenanceSummaries?.get(camera._id) ?? null;
       const cameraStatus = this.deriveCameraStatus(
         projectStatusNormalized,
@@ -1492,7 +1574,16 @@ export class CameraMonitorComponent implements OnInit {
         maintenanceLowImages,
         maintenanceStatusPhotoDirty,
         maintenanceStatusLowImages,
+        maintenanceStatusBetterView,
         lastMaintenanceCompletedAt,
+        photoDirtyMarkedBy,
+        photoDirtyMarkedAt,
+        photoDirtyRemovedBy,
+        photoDirtyRemovedAt,
+        betterViewMarkedBy,
+        betterViewMarkedAt,
+        betterViewRemovedBy,
+        betterViewRemovedAt,
       };
     });
   }
@@ -1620,7 +1711,7 @@ export class CameraMonitorComponent implements OnInit {
       this.selectedProjectId.set(parsed.projectId ?? null);
       this.selectedCountry.set(parsed.country ?? null);
       this.selectedCameraStatus.set(parsed.status ?? 'all');
-      this.sortMode.set(parsed.sortMode ?? 'developer');
+      // sortMode is always 'developer' now, no need to restore
       this.searchTerm.set(parsed.search ?? '');
     } catch {
       // ignore malformed storage
@@ -1866,6 +1957,13 @@ export class CameraMonitorComponent implements OnInit {
       const isMaintenanceStatus =
         camera.status === 'maintenance' || camera.status === 'maintenance_long_time';
       return isMaintenanceStatus && !!camera.maintenanceStatusPhotoDirty;
+    }
+
+    // Virtual filter: maintenance / better view (maintenance, but exclude hold tab)
+    if (status === 'maintenance_better_view') {
+      const isMaintenanceStatus =
+        camera.status === 'maintenance' || camera.status === 'maintenance_long_time';
+      return isMaintenanceStatus && !!camera.maintenanceStatusBetterView;
     }
 
     // Virtual filter: device expired (under maintenance)
