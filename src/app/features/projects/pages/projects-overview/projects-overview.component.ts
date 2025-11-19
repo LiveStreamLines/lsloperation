@@ -6,7 +6,7 @@ import { of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
 import { ProjectService } from '@core/services/project.service';
 import { DeveloperService } from '@core/services/developer.service';
-import { Project } from '@core/models/project.model';
+import { Project, ProjectInternalAttachment } from '@core/models/project.model';
 import { Developer } from '@core/models/developer.model';
 import { environment } from '@env';
 
@@ -18,6 +18,9 @@ interface ProjectFormState {
   index: string;
   isActive: boolean;
   status: string;
+  internalDescription: string;
+  internalAttachments: File[];
+  existingInternalAttachments: ProjectInternalAttachment[];
   logoFile: File | null;
   logoPreview: string | null;
   isSaving: boolean;
@@ -195,6 +198,86 @@ export class ProjectsOverviewComponent implements OnInit {
     }
   }
 
+  onInternalAttachmentsChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) {
+      return;
+    }
+    const files = Array.from(input.files);
+    this.projectForm.update((state) => ({
+      ...state,
+      internalAttachments: [...state.internalAttachments, ...files],
+      error: null,
+    }));
+    input.value = '';
+  }
+
+  removeInternalAttachment(index: number): void {
+    this.projectForm.update((state) => {
+      const updated = [...state.internalAttachments];
+      updated.splice(index, 1);
+      return {
+        ...state,
+        internalAttachments: updated,
+        error: null,
+      };
+    });
+  }
+
+  deleteInternalAttachment(attachmentId: string): void {
+    const project = this.editProjectModal();
+    if (!project) {
+      return;
+    }
+
+    this.projectForm.update((state) => ({ ...state, isSaving: true, error: null }));
+
+    this.projectService
+      .deleteInternalAttachment(project._id, attachmentId)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        catchError((error) => {
+          console.error('Failed to delete attachment', error);
+          this.projectForm.update((state) => ({
+            ...state,
+            isSaving: false,
+            error: 'Unable to delete attachment. Please try again.',
+          }));
+          return of<Project | null>(null);
+        }),
+      )
+      .subscribe((updatedProject) => {
+        if (updatedProject) {
+          this.projectForm.update((state) => ({
+            ...state,
+            existingInternalAttachments: updatedProject.internalAttachments ?? [],
+            isSaving: false,
+            error: null,
+          }));
+          this.editProjectModal.set(updatedProject);
+        }
+      });
+  }
+
+  formatFileSize(bytes: number | undefined): string {
+    if (!bytes || bytes === 0) {
+      return '0 Bytes';
+    }
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  }
+
+  getAttachmentUrl(attachment: ProjectInternalAttachment): string {
+    if (!attachment.url) {
+      return '';
+    }
+    const sanitized = attachment.url.startsWith('/') ? attachment.url : `/${attachment.url}`;
+    const mediaBaseUrl = environment.apiUrl.replace('/api', '');
+    return `${mediaBaseUrl}${sanitized}`;
+  }
+
   updateFormField(field: string, value: string | boolean): void {
     this.projectForm.update((state) => ({
       ...state,
@@ -300,6 +383,9 @@ export class ProjectsOverviewComponent implements OnInit {
       index: '0',
       isActive: true,
       status: 'new',
+      internalDescription: '',
+      internalAttachments: [],
+      existingInternalAttachments: [],
       logoFile: null,
       logoPreview: null,
       isSaving: false,
@@ -329,6 +415,9 @@ export class ProjectsOverviewComponent implements OnInit {
       index: project.index?.toString() || '0',
       isActive: project.isActive === true || project.isActive === 'true' || project.isActive === 'True',
       status: project.status || 'new',
+      internalDescription: project.internalDescription || '',
+      internalAttachments: [],
+      existingInternalAttachments: project.internalAttachments ?? [],
       logoFile: null,
       logoPreview,
       isSaving: false,
@@ -354,12 +443,18 @@ export class ProjectsOverviewComponent implements OnInit {
     formData.append('index', form.index);
     formData.append('isActive', form.isActive.toString());
     formData.append('status', form.status);
+    formData.append('internalDescription', form.internalDescription || '');
 
     if (form.logoFile) {
       formData.append('logo', form.logoFile);
     } else if (this.isAddMode() === false && this.editProjectModal()?.logo) {
       formData.append('logo', this.editProjectModal()!.logo!);
     }
+
+    // Append internal attachments
+    form.internalAttachments.forEach((file) => {
+      formData.append('internalAttachments', file);
+    });
 
     return formData;
   }

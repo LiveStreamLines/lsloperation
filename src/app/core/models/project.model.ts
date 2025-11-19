@@ -11,6 +11,8 @@ export interface Project {
   isActive?: boolean | string;
   index?: string | number;
   attachments?: ProjectAttachment[];
+  internalDescription?: string;
+  internalAttachments?: ProjectInternalAttachment[];
   [key: string]: unknown;
 }
 
@@ -28,6 +30,18 @@ export interface ProjectAttachment {
   size?: number;
   type?: string;
   url?: string;
+  uploadedAt?: string;
+  uploadedBy?: string;
+  [key: string]: unknown;
+}
+
+export interface ProjectInternalAttachment {
+  _id: string;
+  name: string;
+  originalName?: string;
+  size: number;
+  type?: string;
+  url: string;
   uploadedAt?: string;
   uploadedBy?: string;
   [key: string]: unknown;
