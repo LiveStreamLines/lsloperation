@@ -174,6 +174,41 @@ export class DevelopersOverviewComponent implements OnInit {
     });
   }
 
+  deleteInternalAttachment(attachmentId: string): void {
+    const developer = this.editDeveloperModal();
+    if (!developer) {
+      return;
+    }
+
+    this.developerForm.update((state) => ({ ...state, isSaving: true, error: null }));
+
+    this.developerService
+      .deleteAttachment(developer._id, attachmentId)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        catchError((error) => {
+          console.error('Failed to delete attachment', error);
+          this.developerForm.update((state) => ({
+            ...state,
+            isSaving: false,
+            error: 'Unable to delete attachment. Please try again.',
+          }));
+          return of<Developer | null>(null);
+        }),
+      )
+      .subscribe((updatedDeveloper) => {
+        if (updatedDeveloper) {
+          this.developerForm.update((state) => ({
+            ...state,
+            existingInternalAttachments: updatedDeveloper.internalAttachments ?? [],
+            isSaving: false,
+            error: null,
+          }));
+          this.editDeveloperModal.set(updatedDeveloper);
+        }
+      });
+  }
+
   updateFormField(section: 'basic' | 'contact' | 'business' | 'address' | 'contactPerson' | 'bankDetails', field: string, value: string | boolean): void {
     this.developerForm.update((state) => {
       if (section === 'basic') {

@@ -60,6 +60,11 @@ export class DeveloperService {
     return this.http.put<Developer>(`${this.baseUrl}/${id}`, formData);
   }
 
+  deleteAttachment(developerId: string, attachmentId: string): Observable<Developer> {
+    this.clearCache();
+    return this.http.delete<Developer>(`${this.baseUrl}/${developerId}/attachments/${attachmentId}`);
+  }
+
   clearCache(): void {
     this.cache = null;
     this.request$ = undefined;

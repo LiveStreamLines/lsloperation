@@ -261,15 +261,32 @@
                     <div class="space-y-2 rounded-2xl border border-slate-200 bg-white p-3">
                       <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Existing attachments</p>
                       @for (attachment of developerForm().existingInternalAttachments; track attachment._id) {
-                        <a
-                          class="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-sm text-indigo-600 hover:text-indigo-500"
-                          [href]="getAttachmentUrl(attachment)"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <span class="font-semibold text-slate-900">{{ attachment.originalName || attachment.name }}</span>
-                          <span class="text-xs text-slate-500">{{ formatFileSize(attachment.size) }}</span>
-                        </a>
+                        <div class="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2">
+                          <a
+                            class="flex flex-1 items-center justify-between text-sm text-indigo-600 hover:text-indigo-500"
+                            [href]="getAttachmentUrl(attachment)"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <span class="font-semibold text-slate-900">{{ attachment.originalName || attachment.name }}</span>
+                            <span class="text-xs text-slate-500">{{ formatFileSize(attachment.size) }}</span>
+                          </a>
+                          <button
+                            type="button"
+                            class="ml-3 text-xs font-semibold text-rose-600 hover:text-rose-500"
+                            (click)="deleteInternalAttachment(attachment._id)"
+                            [disabled]="developerForm().isSaving"
+                            title="Delete attachment"
+                          >
+                            <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
+                              <path
+                                fill-rule="evenodd"
+                                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                                clip-rule="evenodd"
+                              />
+                            </svg>
+                          </button>
+                        </div>
                       }
                     </div>
                   }
