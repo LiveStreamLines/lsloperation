@@ -23,11 +23,24 @@ export interface DeveloperBankDetails {
   [key: string]: unknown;
 }
 
+export interface DeveloperInternalAttachment {
+  _id: string;
+  name: string;
+  originalName: string;
+  size: number;
+  type: string;
+  url: string;
+  uploadedAt?: string;
+  uploadedBy?: string;
+}
+
 export interface Developer {
   _id: string;
   developerTag?: string;
   developerName: string;
   description?: string;
+  internalDescription?: string;
+  internalAttachments?: DeveloperInternalAttachment[];
   logo?: string | null;
   createdDate?: string;
   isActive?: boolean | string;

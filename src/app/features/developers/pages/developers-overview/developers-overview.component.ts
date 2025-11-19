@@ -5,13 +5,16 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
 import { DeveloperService } from '@core/services/developer.service';
-import { Developer } from '@core/models/developer.model';
+import { Developer, DeveloperInternalAttachment } from '@core/models/developer.model';
 import { environment } from '@env';
 
 interface DeveloperFormState {
   developerName: string;
   developerTag: string;
   description: string;
+  internalDescription: string;
+  internalAttachments: File[];
+  existingInternalAttachments: DeveloperInternalAttachment[];
   isActive: boolean;
   email: string;
   phone: string;
@@ -145,6 +148,32 @@ export class DevelopersOverviewComponent implements OnInit {
     }
   }
 
+  onInternalAttachmentsChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) {
+      return;
+    }
+    const files = Array.from(input.files);
+    this.developerForm.update((state) => ({
+      ...state,
+      internalAttachments: [...state.internalAttachments, ...files],
+      error: null,
+    }));
+    input.value = '';
+  }
+
+  removeInternalAttachment(index: number): void {
+    this.developerForm.update((state) => {
+      const updated = [...state.internalAttachments];
+      updated.splice(index, 1);
+      return {
+        ...state,
+        internalAttachments: updated,
+        error: null,
+      };
+    });
+  }
+
   updateFormField(section: 'basic' | 'contact' | 'business' | 'address' | 'contactPerson' | 'bankDetails', field: string, value: string | boolean): void {
     this.developerForm.update((state) => {
       if (section === 'basic') {
@@ -223,6 +252,9 @@ export class DevelopersOverviewComponent implements OnInit {
       developerName: '',
       developerTag: '',
       description: '',
+      internalDescription: '',
+      internalAttachments: [],
+      existingInternalAttachments: [],
       isActive: true,
       email: '',
       phone: '',
@@ -265,6 +297,9 @@ export class DevelopersOverviewComponent implements OnInit {
       developerName: developer.developerName || '',
       developerTag: developer.developerTag || '',
       description: developer.description || '',
+      internalDescription: developer.internalDescription || '',
+      internalAttachments: [],
+      existingInternalAttachments: developer.internalAttachments ?? [],
       isActive: developer.isActive === true || developer.isActive === 'true' || developer.isActive === 'True',
       email: developer.email || '',
       phone: developer.phone || '',
@@ -303,6 +338,7 @@ export class DevelopersOverviewComponent implements OnInit {
     formData.append('developerName', form.developerName.trim());
     formData.append('developerTag', form.developerTag.trim());
     formData.append('description', form.description.trim());
+    formData.append('internalDescription', form.internalDescription || '');
     formData.append('isActive', form.isActive.toString());
 
     formData.append('email', form.email || '');
@@ -328,6 +364,9 @@ export class DevelopersOverviewComponent implements OnInit {
     formData.append('bankDetails[accountNumber]', form.bankDetails.accountNumber || '');
     formData.append('bankDetails[iban]', form.bankDetails.iban || '');
     formData.append('bankDetails[swiftCode]', form.bankDetails.swiftCode || '');
+    form.internalAttachments.forEach((file) => {
+      formData.append('internalAttachments', file, file.name);
+    });
 
     if (form.logoFile) {
       formData.append('logo', form.logoFile);
@@ -336,6 +375,32 @@ export class DevelopersOverviewComponent implements OnInit {
     }
 
     return formData;
+  }
+
+  formatFileSize(bytes: number): string {
+    if (!bytes && bytes !== 0) {
+      return '';
+    }
+    if (bytes === 0) {
+      return '0 B';
+    }
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const value = bytes / Math.pow(k, i);
+    return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${sizes[i]}`;
+  }
+
+  getAttachmentUrl(attachment: DeveloperInternalAttachment): string {
+    if (!attachment?.url) {
+      return '';
+    }
+    if (attachment.url.startsWith('http://') || attachment.url.startsWith('https://')) {
+      return attachment.url;
+    }
+    const sanitized = attachment.url.startsWith('/') ? attachment.url : `/${attachment.url}`;
+    const mediaBaseUrl = environment.apiUrl.replace('/api', '');
+    return `${mediaBaseUrl}${sanitized}`;
   }
 
   formatDate(date: string | undefined): string {
