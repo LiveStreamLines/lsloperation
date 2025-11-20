@@ -9,6 +9,7 @@ export interface Camera {
   serverFolder?: string;
   createdDate?: string;
   installedDate?: string;
+  maintenanceCycleStartDate?: string;
   cindex?: number;
   isActive?: boolean;
   country?: string;
@@ -94,7 +95,24 @@ export interface CameraHealthResponse {
     count: number;
   };
   totalImages: number;
+  hasMemoryAssigned?: boolean;
+  memoryAvailable?: string | null;
+  hasWrongTime?: boolean;
   error?: string;
   [key: string]: unknown;
+}
+
+export interface CameraStatusHistory {
+  _id: string;
+  cameraId: string;
+  cameraName?: string;
+  developerId?: string;
+  projectId?: string;
+  statusType: 'photoDirty' | 'betterView';
+  action: 'on' | 'off';
+  isActive: boolean;
+  performedBy: string;
+  performedByEmail?: string | null;
+  performedAt: string;
 }
 

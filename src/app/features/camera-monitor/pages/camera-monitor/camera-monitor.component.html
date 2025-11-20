@@ -493,24 +493,33 @@
                                 camera.status === 'maintenance_long_time') &&
                               (camera.maintenanceLowImages || camera.maintenanceStatusLowImages)
                             ) {
-                              <span
-                                class="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700"
+                              <button
+                                type="button"
+                                class="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 transition hover:border-amber-400 hover:bg-amber-100 cursor-pointer"
+                                (click)="openStatusHistory(camera, 'lowImages')"
                               >
                                 Less image
-                                @if (camera.maintenanceStatusLowImages) {
-                                  <button
-                                    type="button"
-                                    class="ml-2 inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700 hover:bg-amber-100"
-                                    (click)="clearLowImagesStatus(camera)"
-                                  >
-                                    Clear
-                                  </button>
+                                @if (camera.lowImagesMarkedBy || camera.lowImagesMarkedAt) {
+                                  <span class="ml-1.5 text-[9px] normal-case text-amber-600">
+                                    @if (camera.lowImagesMarkedBy && camera.lowImagesMarkedAt) {
+                                      by {{ camera.lowImagesMarkedBy }} on {{ camera.lowImagesMarkedAt | date: 'short' }}
+                                      @if (getDaysSinceLowImagesMarked(camera) !== null) {
+                                        ({{ getDaysSinceLowImagesMarked(camera) }} day{{ getDaysSinceLowImagesMarked(camera) !== 1 ? 's' : '' }})
+                                      }
+                                    } @else if (camera.lowImagesMarkedBy) {
+                                      by {{ camera.lowImagesMarkedBy }}
+                                    } @else if (camera.lowImagesMarkedAt) {
+                                      on {{ camera.lowImagesMarkedAt | date: 'short' }}
+                                    }
+                                  </span>
                                 }
-                              </span>
+                              </button>
                             }
                             @if (camera.maintenanceStatusPhotoDirty) {
-                              <span
-                                class="inline-flex items-center rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700"
+                              <button
+                                type="button"
+                                class="inline-flex items-center rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700 transition hover:border-rose-400 hover:bg-rose-100 cursor-pointer"
+                                (click)="openStatusHistory(camera, 'photoDirty')"
                               >
                                 Photo dirty
                                 @if (camera.photoDirtyMarkedBy || camera.photoDirtyMarkedAt) {
@@ -524,11 +533,13 @@
                                     }
                                   </span>
                                 }
-                              </span>
+                              </button>
                             }
                             @if (camera.maintenanceStatusBetterView) {
-                              <span
-                                class="inline-flex items-center rounded-full border border-indigo-300 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700"
+                              <button
+                                type="button"
+                                class="inline-flex items-center rounded-full border border-indigo-300 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 transition hover:border-indigo-400 hover:bg-indigo-100 cursor-pointer"
+                                (click)="openStatusHistory(camera, 'betterView')"
                               >
                                 Better view
                                 @if (camera.betterViewMarkedBy || camera.betterViewMarkedAt) {
@@ -542,6 +553,33 @@
                                     }
                                   </span>
                                 }
+                              </button>
+                            }
+                            @if (camera.maintenanceStatusWrongTime) {
+                              <button
+                                type="button"
+                                class="inline-flex items-center rounded-full border border-orange-300 bg-orange-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700 transition hover:border-orange-400 hover:bg-orange-100 cursor-pointer"
+                                (click)="openStatusHistory(camera, 'wrongTime')"
+                              >
+                                Wrong time
+                                @if (camera.wrongTimeMarkedBy || camera.wrongTimeMarkedAt) {
+                                  <span class="ml-1.5 text-[9px] normal-case text-orange-600">
+                                    @if (camera.wrongTimeMarkedBy && camera.wrongTimeMarkedAt) {
+                                      by {{ camera.wrongTimeMarkedBy }} on {{ camera.wrongTimeMarkedAt | date: 'short' }}
+                                    } @else if (camera.wrongTimeMarkedBy) {
+                                      by {{ camera.wrongTimeMarkedBy }}
+                                    } @else if (camera.wrongTimeMarkedAt) {
+                                      on {{ camera.wrongTimeMarkedAt | date: 'short' }}
+                                    }
+                                  </span>
+                                }
+                              </button>
+                            }
+                            @if (hasLowMemory(camera)) {
+                              <span
+                                class="inline-flex items-center rounded-full border border-purple-300 bg-purple-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700"
+                              >
+                                Memory capacity
                               </span>
                             }
                             <span class="text-[10px] uppercase tracking-wide text-slate-400">{{ lastUpdateLabel(camera) }}</span>
@@ -588,6 +626,24 @@
                             <dt class="font-semibold text-slate-700">Last update</dt>
                             <dd>{{ camera.lastUpdatedAt ? (camera.lastUpdatedAt | date: 'medium') : 'Not available' }}</dd>
                           </div>
+                          <div class="flex items-center justify-between">
+                            <dt class="font-semibold text-slate-700">Last maintenance</dt>
+                            <dd class="text-xs text-slate-500">
+                              @if (camera.lastMaintenanceCompletedAt) {
+                                {{ camera.lastMaintenanceCompletedAt | date: 'medium' }}
+                              } @else if (camera.maintenanceCycleStartDate) {
+                                Cycle started {{ camera.maintenanceCycleStartDate | date: 'medium' }}
+                              } @else {
+                                No completed tasks
+                              }
+                            </dd>
+                          </div>
+                          @if (camera.hasMemoryAssigned) {
+                            <div class="flex items-center justify-between">
+                              <dt class="font-semibold text-slate-700">Memory available</dt>
+                              <dd class="text-xs text-slate-500">{{ camera.memoryAvailable || 'Not specified' }}</dd>
+                            </div>
+                          }
                           @if (camera.photoDirtyRemovedBy || camera.photoDirtyRemovedAt) {
                             <div class="flex items-center justify-between">
                               <dt class="font-semibold text-slate-700">Photo dirty removed</dt>
@@ -612,6 +668,34 @@
                                   by {{ camera.betterViewRemovedBy }}
                                 } @else if (camera.betterViewRemovedAt) {
                                   on {{ camera.betterViewRemovedAt | date: 'short' }}
+                                }
+                              </dd>
+                            </div>
+                          }
+                          @if (camera.lowImagesRemovedBy || camera.lowImagesRemovedAt) {
+                            <div class="flex items-center justify-between">
+                              <dt class="font-semibold text-slate-700">Less image removed</dt>
+                              <dd class="text-xs text-slate-500">
+                                @if (camera.lowImagesRemovedBy && camera.lowImagesRemovedAt) {
+                                  by {{ camera.lowImagesRemovedBy }} on {{ camera.lowImagesRemovedAt | date: 'short' }}
+                                } @else if (camera.lowImagesRemovedBy) {
+                                  by {{ camera.lowImagesRemovedBy }}
+                                } @else if (camera.lowImagesRemovedAt) {
+                                  on {{ camera.lowImagesRemovedAt | date: 'short' }}
+                                }
+                              </dd>
+                            </div>
+                          }
+                          @if (camera.wrongTimeRemovedBy || camera.wrongTimeRemovedAt) {
+                            <div class="flex items-center justify-between">
+                              <dt class="font-semibold text-slate-700">Wrong time removed</dt>
+                              <dd class="text-xs text-slate-500">
+                                @if (camera.wrongTimeRemovedBy && camera.wrongTimeRemovedAt) {
+                                  by {{ camera.wrongTimeRemovedBy }} on {{ camera.wrongTimeRemovedAt | date: 'short' }}
+                                } @else if (camera.wrongTimeRemovedBy) {
+                                  by {{ camera.wrongTimeRemovedBy }}
+                                } @else if (camera.wrongTimeRemovedAt) {
+                                  on {{ camera.wrongTimeRemovedAt | date: 'short' }}
                                 }
                               </dd>
                             </div>
@@ -864,24 +948,33 @@
                     camera.status === 'maintenance_long_time') &&
                   (camera.maintenanceLowImages || camera.maintenanceStatusLowImages)
                 ) {
-                  <span
-                    class="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700"
+                  <button
+                    type="button"
+                    class="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 transition hover:border-amber-400 hover:bg-amber-100 cursor-pointer"
+                    (click)="openStatusHistory(camera, 'lowImages')"
                   >
                     Less image
-                    @if (camera.maintenanceStatusLowImages) {
-                      <button
-                        type="button"
-                        class="ml-2 inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700 hover:bg-amber-100"
-                        (click)="clearLowImagesStatus(camera)"
-                      >
-                        Clear
-                      </button>
+                    @if (camera.lowImagesMarkedBy || camera.lowImagesMarkedAt) {
+                      <span class="ml-1.5 text-[9px] normal-case text-amber-600">
+                        @if (camera.lowImagesMarkedBy && camera.lowImagesMarkedAt) {
+                          by {{ camera.lowImagesMarkedBy }} on {{ camera.lowImagesMarkedAt | date: 'short' }}
+                          @if (getDaysSinceLowImagesMarked(camera) !== null) {
+                            ({{ getDaysSinceLowImagesMarked(camera) }} day{{ getDaysSinceLowImagesMarked(camera) !== 1 ? 's' : '' }})
+                          }
+                        } @else if (camera.lowImagesMarkedBy) {
+                          by {{ camera.lowImagesMarkedBy }}
+                        } @else if (camera.lowImagesMarkedAt) {
+                          on {{ camera.lowImagesMarkedAt | date: 'short' }}
+                        }
+                      </span>
                     }
-                  </span>
+                  </button>
                 }
                 @if (camera.maintenanceStatusPhotoDirty) {
-                  <span
-                    class="inline-flex items-center rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700"
+                  <button
+                    type="button"
+                    class="inline-flex items-center rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700 transition hover:border-rose-400 hover:bg-rose-100 cursor-pointer"
+                    (click)="openStatusHistory(camera, 'photoDirty')"
                   >
                     Photo dirty
                     @if (camera.photoDirtyMarkedBy || camera.photoDirtyMarkedAt) {
@@ -895,11 +988,13 @@
                         }
                       </span>
                     }
-                  </span>
+                  </button>
                 }
                 @if (camera.maintenanceStatusBetterView) {
-                  <span
-                    class="inline-flex items-center rounded-full border border-indigo-300 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700"
+                  <button
+                    type="button"
+                    class="inline-flex items-center rounded-full border border-indigo-300 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 transition hover:border-indigo-400 hover:bg-indigo-100 cursor-pointer"
+                    (click)="openStatusHistory(camera, 'betterView')"
                   >
                     Better view
                     @if (camera.betterViewMarkedBy || camera.betterViewMarkedAt) {
@@ -913,6 +1008,33 @@
                         }
                       </span>
                     }
+                  </button>
+                }
+                @if (camera.maintenanceStatusWrongTime) {
+                  <button
+                    type="button"
+                    class="inline-flex items-center rounded-full border border-orange-300 bg-orange-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700 transition hover:border-orange-400 hover:bg-orange-100 cursor-pointer"
+                    (click)="openStatusHistory(camera, 'wrongTime')"
+                  >
+                    Wrong time
+                    @if (camera.wrongTimeMarkedBy || camera.wrongTimeMarkedAt) {
+                      <span class="ml-1.5 text-[9px] normal-case text-orange-600">
+                        @if (camera.wrongTimeMarkedBy && camera.wrongTimeMarkedAt) {
+                          by {{ camera.wrongTimeMarkedBy }} on {{ camera.wrongTimeMarkedAt | date: 'short' }}
+                        } @else if (camera.wrongTimeMarkedBy) {
+                          by {{ camera.wrongTimeMarkedBy }}
+                        } @else if (camera.wrongTimeMarkedAt) {
+                          on {{ camera.wrongTimeMarkedAt | date: 'short' }}
+                        }
+                      </span>
+                    }
+                  </button>
+                }
+                @if (hasLowMemory(camera)) {
+                  <span
+                    class="inline-flex items-center rounded-full border border-purple-300 bg-purple-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700"
+                  >
+                    Memory capacity
                   </span>
                 }
                 <span class="text-[10px] uppercase tracking-wide text-slate-400">{{ lastUpdateLabel(camera) }}</span>
@@ -945,6 +1067,24 @@
                 <dt class="font-semibold text-slate-700">Last update</dt>
                 <dd>{{ camera.lastUpdatedAt ? (camera.lastUpdatedAt | date: 'medium') : 'Not available' }}</dd>
               </div>
+              <div class="flex items-center justify-between">
+                <dt class="font-semibold text-slate-700">Last maintenance</dt>
+                <dd class="text-xs text-slate-500">
+                  @if (camera.lastMaintenanceCompletedAt) {
+                    {{ camera.lastMaintenanceCompletedAt | date: 'medium' }}
+                  } @else if (camera.maintenanceCycleStartDate) {
+                    Cycle started {{ camera.maintenanceCycleStartDate | date: 'medium' }}
+                  } @else {
+                    No completed tasks
+                  }
+                </dd>
+              </div>
+              @if (camera.hasMemoryAssigned) {
+                <div class="flex items-center justify-between">
+                  <dt class="font-semibold text-slate-700">Memory available</dt>
+                  <dd class="text-xs text-slate-500">{{ camera.memoryAvailable || 'Not specified' }}</dd>
+                </div>
+              }
               @if (camera.photoDirtyRemovedBy || camera.photoDirtyRemovedAt) {
                 <div class="flex items-center justify-between">
                   <dt class="font-semibold text-slate-700">Photo dirty removed</dt>
@@ -969,6 +1109,34 @@
                       by {{ camera.betterViewRemovedBy }}
                     } @else if (camera.betterViewRemovedAt) {
                       on {{ camera.betterViewRemovedAt | date: 'short' }}
+                    }
+                  </dd>
+                </div>
+              }
+              @if (camera.lowImagesRemovedBy || camera.lowImagesRemovedAt) {
+                <div class="flex items-center justify-between">
+                  <dt class="font-semibold text-slate-700">Less image removed</dt>
+                  <dd class="text-xs text-slate-500">
+                    @if (camera.lowImagesRemovedBy && camera.lowImagesRemovedAt) {
+                      by {{ camera.lowImagesRemovedBy }} on {{ camera.lowImagesRemovedAt | date: 'short' }}
+                    } @else if (camera.lowImagesRemovedBy) {
+                      by {{ camera.lowImagesRemovedBy }}
+                    } @else if (camera.lowImagesRemovedAt) {
+                      on {{ camera.lowImagesRemovedAt | date: 'short' }}
+                    }
+                  </dd>
+                </div>
+              }
+              @if (camera.wrongTimeRemovedBy || camera.wrongTimeRemovedAt) {
+                <div class="flex items-center justify-between">
+                  <dt class="font-semibold text-slate-700">Wrong time removed</dt>
+                  <dd class="text-xs text-slate-500">
+                    @if (camera.wrongTimeRemovedBy && camera.wrongTimeRemovedAt) {
+                      by {{ camera.wrongTimeRemovedBy }} on {{ camera.wrongTimeRemovedAt | date: 'short' }}
+                    } @else if (camera.wrongTimeRemovedBy) {
+                      by {{ camera.wrongTimeRemovedBy }}
+                    } @else if (camera.wrongTimeRemovedAt) {
+                      on {{ camera.wrongTimeRemovedAt | date: 'short' }}
                     }
                   </dd>
                 </div>
@@ -1691,6 +1859,68 @@
         </button>
         <div class="flex-1 overflow-y-auto">
           <app-camera-history [cameraIdInput]="cameraHistoryModalCameraId()!" />
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (statusHistoryModal()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
+      <div class="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <h2 class="text-lg font-semibold text-slate-900">
+            {{ statusHistoryModal()!.statusType === 'photoDirty' ? 'Photo Dirty' : 'Better View' }} History
+          </h2>
+          <button
+            type="button"
+            class="rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900"
+            (click)="closeStatusHistoryModal()"
+          >
+            <span class="sr-only">Close modal</span>
+            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                d="M6.28 5.22a.75.75 0 10-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22z"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="max-h-[60vh] overflow-y-auto px-6 py-4">
+          @if (statusHistoryLoading()) {
+            <div class="flex items-center justify-center py-8">
+              <div class="h-8 w-8 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-500"></div>
+            </div>
+          } @else if (statusHistory().length === 0) {
+            <div class="py-8 text-center text-sm text-slate-500">No history available</div>
+          } @else {
+            <div class="space-y-3">
+              @for (entry of statusHistory(); track entry._id) {
+                <div
+                  class="flex items-start justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                  [ngClass]="entry.action === 'on' ? 'border-rose-200 bg-rose-50' : 'border-emerald-200 bg-emerald-50'"
+                >
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                        [ngClass]="
+                          entry.action === 'on'
+                            ? 'border-rose-300 bg-rose-100 text-rose-700'
+                            : 'border-emerald-300 bg-emerald-100 text-emerald-700'
+                        "
+                      >
+                        {{ entry.action === 'on' ? 'Turned On' : 'Turned Off' }}
+                      </span>
+                    </div>
+                    <p class="mt-2 text-sm font-semibold text-slate-900">By: {{ entry.performedBy }}</p>
+                    <p class="mt-1 text-xs text-slate-500">{{ entry.performedAt | date: 'medium' }}</p>
+                    @if (entry.performedByEmail) {
+                      <p class="mt-1 text-xs text-slate-400">{{ entry.performedByEmail }}</p>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
         </div>
       </div>
     </div>

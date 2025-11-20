@@ -345,8 +345,22 @@ export class CameraHistoryComponent implements OnInit {
               .getHealth(tags.developerTag, tags.projectTag, tags.cameraName)
               .pipe(catchError(() => of<CameraHealthResponse | null>(null)));
 
+            // Calculate yesterday's date in YYYY-MM-DD format
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = this.formatDateForInput(yesterday);
+            const yesterdayBackend = this.toBackendDate(yesterdayStr);
+
+            // Load history with yesterday's date filter
+            const historyRequest = yesterdayBackend
+              ? this.cameraService.getHistoryPictures(tags.developerTag, tags.projectTag, tags.cameraName, {
+                  date1: yesterdayBackend,
+                  date2: yesterdayBackend,
+                })
+              : this.cameraService.getHistoryPictures(tags.developerTag, tags.projectTag, tags.cameraName);
+
             return forkJoin({
-              history: this.cameraService.getHistoryPictures(tags.developerTag, tags.projectTag, tags.cameraName),
+              history: historyRequest,
               preview: this.cameraService
                 .getHistoryPreview(tags.developerTag, tags.projectTag, tags.cameraName)
                 .pipe(catchError(() => of<CameraHistoryPreviewResponse | null>(null))),
@@ -365,15 +379,10 @@ export class CameraHistoryComponent implements OnInit {
                 this.maintenanceTasks.set(maintenance ?? []);
                 this.health.set(health);
 
-                const firstDate = this.extractDateFromFilename(history.firstPhoto);
-                const lastDate = this.extractDateFromFilename(history.lastPhoto);
-                // Set default to first date
-                this.selectedDate.set(firstDate);
-                this.appliedDate.set(firstDate);
-                // Load images for the first date automatically
-                if (firstDate) {
-                  this.loadHistoryForDate(firstDate);
-                }
+                // Set default to yesterday's date
+                this.selectedDate.set(yesterdayStr);
+                this.appliedDate.set(yesterdayStr);
+                // Images are already filtered for yesterday from the API call
               }),
               map(() => undefined),
             );
@@ -533,6 +542,13 @@ export class CameraHistoryComponent implements OnInit {
       return undefined;
     }
     return value.replace(/-/g, '');
+  }
+
+  private formatDateForInput(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   private fromBackendDate(value: string): string {

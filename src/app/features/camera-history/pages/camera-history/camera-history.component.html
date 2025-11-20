@@ -86,26 +86,15 @@
             <div class="mt-6 space-y-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
               <h3 class="text-sm font-semibold text-indigo-900">Camera Health</h3>
               <dl class="space-y-2 text-sm text-indigo-700">
-                <div class="flex items-center justify-between">
-                  <dt class="font-semibold text-indigo-800">Total Images</dt>
-                  <dd class="font-semibold text-indigo-900">{{ health()!.totalImages }}</dd>
-                </div>
                 @if (health()!.firstDay) {
-                  <div class="flex items-center justify-between border-t border-indigo-200 pt-2">
-                    <dt class="text-indigo-700">{{ health()!.firstDay?.date }}</dt>
+                  <div class="flex items-center justify-between">
+                    <dt class="font-semibold text-indigo-800">{{ health()!.firstDay?.date }} (Yesterday)</dt>
                     <dd class="font-semibold text-indigo-900">{{ health()!.firstDay?.count }} images</dd>
                   </div>
-                }
-                @if (health()!.secondDay) {
-                  <div class="flex items-center justify-between border-t border-indigo-200 pt-2">
-                    <dt class="text-indigo-700">{{ health()!.secondDay?.date }}</dt>
-                    <dd class="font-semibold text-indigo-900">{{ health()!.secondDay?.count }} images</dd>
-                  </div>
-                }
-                @if (health()!.thirdDay) {
-                  <div class="flex items-center justify-between border-t border-indigo-200 pt-2">
-                    <dt class="text-indigo-700">{{ health()!.thirdDay?.date }}</dt>
-                    <dd class="font-semibold text-indigo-900">{{ health()!.thirdDay?.count }} images</dd>
+                } @else {
+                  <div class="flex items-center justify-between">
+                    <dt class="font-semibold text-indigo-800">Yesterday</dt>
+                    <dd class="font-semibold text-indigo-900">0 images</dd>
                   </div>
                 }
               </dl>

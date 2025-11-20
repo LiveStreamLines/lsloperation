@@ -8,6 +8,7 @@ import {
   CameraHistoryResponse,
   CameraHistoryVideoResponse,
   CameraLastPicture,
+  CameraStatusHistory,
 } from '@core/models/camera.model';
 import { Observable, of } from 'rxjs';
 import { catchError, map, shareReplay, tap } from 'rxjs/operators';
@@ -165,13 +166,24 @@ export class CameraService {
 
   updateMaintenanceStatus(
     cameraId: string,
-    payload: { photoDirty?: boolean; lowImages?: boolean; betterView?: boolean },
+    payload: { photoDirty?: boolean; lowImages?: boolean; betterView?: boolean; wrongTime?: boolean },
   ): Observable<Camera> {
     return this.http.put<Camera>(`${this.baseUrl}/${cameraId}/maintenance-status`, payload).pipe(
       tap(() => {
         this.clearCache();
       }),
     );
+  }
+
+  getStatusHistory(cameraId?: string): Observable<CameraStatusHistory[]> {
+    if (cameraId) {
+      return this.http.get<CameraStatusHistory[]>(`${environment.apiUrl}/camera-status-history/${cameraId}`);
+    }
+    return this.http.get<CameraStatusHistory[]>(`${environment.apiUrl}/camera-status-history`);
+  }
+
+  getMaintenanceCycleStartDate(): Observable<{ cycleStartDate: string | null }> {
+    return this.http.get<{ cycleStartDate: string | null }>(`${this.baseUrl}/maintenance-cycle/start-date`);
   }
 
   clearCache(): void {
