@@ -16,6 +16,8 @@ interface ProjectFormState {
   description: string;
   developerId: string;
   index: string;
+  lat: string;
+  lng: string;
   isActive: boolean;
   status: string;
   internalDescription: string;
@@ -381,6 +383,8 @@ export class ProjectsOverviewComponent implements OnInit {
       description: '',
       developerId: '',
       index: '0',
+      lat: '',
+      lng: '',
       isActive: true,
       status: 'new',
       internalDescription: '',
@@ -413,6 +417,8 @@ export class ProjectsOverviewComponent implements OnInit {
       description: project.description || '',
       developerId,
       index: project.index?.toString() || '0',
+      lat: (project as any).lat?.toString() || '',
+      lng: (project as any).lng?.toString() || '',
       isActive: project.isActive === true || project.isActive === 'true' || project.isActive === 'True',
       status: project.status || 'new',
       internalDescription: project.internalDescription || '',
@@ -441,6 +447,8 @@ export class ProjectsOverviewComponent implements OnInit {
     formData.append('description', form.description.trim());
     formData.append('developer', form.developerId);
     formData.append('index', form.index);
+    formData.append('lat', form.lat || '');
+    formData.append('lng', form.lng || '');
     formData.append('isActive', form.isActive.toString());
     formData.append('status', form.status);
     formData.append('internalDescription', form.internalDescription || '');

@@ -217,6 +217,7 @@ export class MaintenanceOverviewComponent implements OnInit {
   readonly selectedProjectId = signal<string | null>(null);
   readonly selectedCameraId = signal<string | null>(null);
   readonly selectedUserId = signal<string | null>(null);
+  readonly selectedAssignedById = signal<string | null>(null);
   readonly selectedTaskType = signal<string | null>(null);
   readonly selectedStatus = signal<MaintenanceStatus | 'all' | null>('pending');
   readonly selectedTaskAssignment = signal<'all' | 'assigned-to-me' | 'assigned-by-me' | null>('all');
@@ -456,6 +457,25 @@ export class MaintenanceOverviewComponent implements OnInit {
       })),
   );
 
+  readonly assignedByOptions = computed<FilterOption[]>(() => {
+    const tasks = this.normalizedTasks();
+    const assignedByUserIds = new Set<string>();
+    
+    tasks.forEach((task) => {
+      if (task.assignedBy?.id) {
+        assignedByUserIds.add(task.assignedBy.id);
+      }
+    });
+
+    return [...this.users()]
+      .filter((user) => assignedByUserIds.has(user._id))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((user) => ({
+        value: user._id,
+        label: `${user.name}${user.role ? ` (${user.role})` : ''}`,
+      }));
+  });
+
   readonly developerMap = computed(() => new Map(this.developers().map((dev) => [dev._id, dev])));
   readonly projectMap = computed(() => new Map(this.projects().map((proj) => [proj._id, proj])));
   readonly cameraMap = computed(() => new Map(this.cameras().map((cam) => [cam._id, cam])));
@@ -471,6 +491,7 @@ export class MaintenanceOverviewComponent implements OnInit {
     const projectId = this.selectedProjectId();
     const cameraId = this.selectedCameraId();
     const userId = this.selectedUserId();
+    const assignedById = this.selectedAssignedById();
     const taskType = this.selectedTaskType();
     const status = this.selectedStatus();
     const taskAssignment = this.selectedTaskAssignment();
@@ -490,6 +511,9 @@ export class MaintenanceOverviewComponent implements OnInit {
           return false;
         }
         if (taskType && task.taskType !== taskType) {
+          return false;
+        }
+        if (assignedById && task.assignedBy?.id !== assignedById) {
           return false;
         }
 
@@ -561,7 +585,7 @@ export class MaintenanceOverviewComponent implements OnInit {
         
         return true;
       })
-      .sort((a, b) => this.compareDatesDesc(a.dateOfRequest, b.dateOfRequest));
+      .sort((a, b) => this.compareDatesDesc(this.getLastStatusTime(a), this.getLastStatusTime(b)));
   });
 
   readonly metricCards = computed<MaintenanceMetricCard[]>(() => {
@@ -650,6 +674,10 @@ export class MaintenanceOverviewComponent implements OnInit {
     this.selectedUserId.set(value || null);
   }
 
+  onAssignedByChange(value: string): void {
+    this.selectedAssignedById.set(value || null);
+  }
+
   onTaskTypeChange(value: string): void {
     this.selectedTaskType.set(value || null);
   }
@@ -670,6 +698,8 @@ export class MaintenanceOverviewComponent implements OnInit {
     this.selectedDeveloperId.set(null);
     this.selectedProjectId.set(null);
     this.selectedCameraId.set(null);
+    this.selectedUserId.set(null);
+    this.selectedAssignedById.set(null);
     this.selectedTaskType.set(null);
     this.selectedTaskAssignment.set('all');
 
@@ -705,8 +735,28 @@ export class MaintenanceOverviewComponent implements OnInit {
       });
   }
 
+  isTaskAssignedToCurrentUser(task: UiMaintenance): boolean {
+    const currentUserId = this.currentUserId();
+    if (!currentUserId) return false;
+    
+    // Check if task is assigned to current user (check assignedUser or assistants)
+    return (
+      (task.assignedUser && String(task.assignedUser.id) === String(currentUserId)) ||
+      task.assistants.some((user) => {
+        const userId = user.id;
+        return userId && String(userId) === String(currentUserId);
+      })
+    );
+  }
+
   startTask(task: UiMaintenance): void {
     if (!task.raw._id || task.status !== 'pending') {
+      return;
+    }
+
+    // Only Super Admins can start tasks not assigned to them
+    // Normal users (even with canSeeAllTasks permission) can only start tasks assigned to them
+    if (!this.isSuperAdmin() && !this.isTaskAssignedToCurrentUser(task)) {
       return;
     }
 
@@ -719,6 +769,12 @@ export class MaintenanceOverviewComponent implements OnInit {
 
   openCompleteTaskModal(task: UiMaintenance): void {
     if (!task.raw._id || task.status !== 'in-progress') {
+      return;
+    }
+
+    // Only Super Admins can complete tasks not assigned to them
+    // Normal users (even with canSeeAllTasks permission) can only complete tasks assigned to them
+    if (!this.isSuperAdmin() && !this.isTaskAssignedToCurrentUser(task)) {
       return;
     }
 
@@ -743,10 +799,13 @@ export class MaintenanceOverviewComponent implements OnInit {
   }
 
   openCancelTaskModal(task: UiMaintenance): void {
-    if (!this.isSuperAdmin()) {
+    if (!task.raw._id || task.status === 'completed' || task.status === 'cancelled') {
       return;
     }
-    if (!task.raw._id || task.status === 'completed' || task.status === 'cancelled') {
+
+    // Only Super Admins can cancel tasks not assigned to them
+    // Normal users can only cancel tasks assigned to them
+    if (!this.isSuperAdmin() && !this.isTaskAssignedToCurrentUser(task)) {
       return;
     }
 
@@ -2604,6 +2663,25 @@ export class MaintenanceOverviewComponent implements OnInit {
     }
     // Return attachments with context 'completion'
     return attachments.filter((att) => att.context === 'completion');
+  }
+
+  private getLastStatusTime(task: UiMaintenance): string | undefined {
+    // Return the most recent time based on the task's current status
+    switch (task.status) {
+      case 'completed':
+        // For completed tasks, use completion time
+        return task.completionTime;
+      case 'cancelled':
+        // For cancelled tasks, use completion time (when it was cancelled) or fallback to dateOfRequest
+        return task.completionTime || task.dateOfRequest || task.createdDate;
+      case 'in-progress':
+        // For in-progress tasks, use start time
+        return task.startTime || task.dateOfRequest || task.createdDate;
+      case 'pending':
+      default:
+        // For pending tasks, use date of request or creation date
+        return task.dateOfRequest || task.createdDate;
+    }
   }
 
   private compareDatesDesc(a?: string, b?: string): number {

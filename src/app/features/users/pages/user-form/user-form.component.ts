@@ -22,6 +22,7 @@ interface UserFormState {
   email: string;
   phone: string;
   role: string;
+  country: 'UAE' | 'Saudi Arabia' | '';
   image: string | null; // Persisted image path
   imageFile: File | null;
   imagePreview: string | null;
@@ -48,8 +49,8 @@ interface UserFormState {
   // Operation permissions - inventory
   canAddDeviceType: boolean;
   canAddDeviceStock: boolean;
-  canAssignUnassignUser: boolean;
-  canAssignUnassignProject: boolean;
+  canSeeAllInventory: boolean;
+  canAssignToUser: boolean;
   // Operation permissions - memory
   canArchiveMemory: boolean;
   memoryRole: string;
@@ -496,8 +497,8 @@ export class UserFormComponent implements OnInit {
         : {
             canAddDeviceType: false,
             canAddDeviceStock: false,
-            canAssignUnassignUser: false,
-            canAssignUnassignProject: false,
+            canSeeAllInventory: false,
+            canAssignToUser: false,
           }),
     }));
   }
@@ -614,6 +615,7 @@ export class UserFormComponent implements OnInit {
       email: '',
       phone: '',
       role: 'Admin',
+      country: '',
       image: null,
       imageFile: null,
       imagePreview: null,
@@ -636,8 +638,8 @@ export class UserFormComponent implements OnInit {
       canSeeAllTasks: false,
       canAddDeviceType: false,
       canAddDeviceStock: false,
-      canAssignUnassignUser: false,
-      canAssignUnassignProject: false,
+      canSeeAllInventory: false,
+      canAssignToUser: false,
       canArchiveMemory: false,
       memoryRole: '',
       inventoryRole: '',
@@ -652,6 +654,7 @@ export class UserFormComponent implements OnInit {
       email: user.email || '',
       phone: user.phone || '',
       role: (user.role as string) || 'User',
+      country: (user.country as 'UAE' | 'Saudi Arabia') || '',
       image: (user.logo || user.image) || null, // Backend uses 'logo', support both for compatibility
       imageFile: null,
       imagePreview: this.buildImagePreview(user.logo || user.image),
@@ -672,8 +675,8 @@ export class UserFormComponent implements OnInit {
         : !!(
             this.normalizeBoolean((user as any).canAddDeviceType, false) ||
             this.normalizeBoolean((user as any).canAddDeviceStock, false) ||
-            this.normalizeBoolean((user as any).canAssignUnassignUser, false) ||
-            this.normalizeBoolean((user as any).canAssignUnassignProject, false)
+            this.normalizeBoolean((user as any).canSeeAllInventory, false) ||
+            this.normalizeBoolean((user as any).canAssignToUser, false)
           ),
       hasMemoryAccess: (user as any).hasMemoryAccess !== undefined
         ? this.normalizeBoolean((user as any).hasMemoryAccess, false)
@@ -693,8 +696,8 @@ export class UserFormComponent implements OnInit {
       canSeeAllTasks: this.normalizeBoolean((user as any).canSeeAllTasks, false),
       canAddDeviceType: this.normalizeBoolean((user as any).canAddDeviceType, false),
       canAddDeviceStock: this.normalizeBoolean((user as any).canAddDeviceStock, false),
-      canAssignUnassignUser: this.normalizeBoolean((user as any).canAssignUnassignUser, false),
-      canAssignUnassignProject: this.normalizeBoolean((user as any).canAssignUnassignProject, false),
+      canSeeAllInventory: this.normalizeBoolean((user as any).canSeeAllInventory, false),
+      canAssignToUser: this.normalizeBoolean((user as any).canAssignToUser, false),
       canArchiveMemory: this.normalizeBoolean((user as any).canArchiveMemory, false),
       memoryRole: (user as any).memoryRole || '',
       inventoryRole: (user as any).inventoryRole || '',
@@ -855,6 +858,9 @@ export class UserFormComponent implements OnInit {
     formData.append('email', form.email.trim());
     formData.append('phone', form.phone?.trim() || '');
     formData.append('role', form.role || 'User');
+    if (form.country) {
+      formData.append('country', form.country);
+    }
 
     const appendBoolean = (key: string, value: boolean) => formData.append(key, value ? 'true' : 'false');
     const appendString = (key: string, value?: string | null) => formData.append(key, value ?? '');
@@ -882,8 +888,8 @@ export class UserFormComponent implements OnInit {
     appendBoolean('canSeeAllTasks', form.canSeeAllTasks);
     appendBoolean('canAddDeviceType', form.canAddDeviceType);
     appendBoolean('canAddDeviceStock', form.canAddDeviceStock);
-    appendBoolean('canAssignUnassignUser', form.canAssignUnassignUser);
-    appendBoolean('canAssignUnassignProject', form.canAssignUnassignProject);
+    appendBoolean('canSeeAllInventory', form.canSeeAllInventory);
+    appendBoolean('canAssignToUser', form.canAssignToUser);
     appendBoolean('canArchiveMemory', form.canArchiveMemory);
 
     appendArray('accessibleDevelopers', form.accessibleDevelopers);

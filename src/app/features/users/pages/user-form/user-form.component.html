@@ -157,6 +157,20 @@
                 }
               </select>
             </label>
+
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+              <span class="font-semibold text-slate-800">Country</span>
+              <select
+                class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                [ngModel]="userForm().country"
+                (ngModelChange)="updateFormField('country', $event)"
+                [ngModelOptions]="{standalone: true}"
+              >
+                <option value="">Select Country</option>
+                <option value="UAE">UAE</option>
+                <option value="Saudi Arabia">Saudi Arabia</option>
+              </select>
+            </label>
           </div>
         </fieldset>
 
@@ -637,22 +651,22 @@
                     <input
                       type="checkbox"
                       class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
-                      [ngModel]="userForm().canAssignUnassignUser"
-                      (ngModelChange)="updateFormField('canAssignUnassignUser', $event)"
+                      [ngModel]="userForm().canSeeAllInventory"
+                      (ngModelChange)="updateFormField('canSeeAllInventory', $event)"
                       [ngModelOptions]="{standalone: true}"
                     />
-                    <span>Assign / unassign user</span>
+                    <span>See all inventory</span>
                   </label>
 
                   <label class="flex items-center gap-2 text-sm text-slate-700">
                     <input
                       type="checkbox"
                       class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
-                      [ngModel]="userForm().canAssignUnassignProject"
-                      (ngModelChange)="updateFormField('canAssignUnassignProject', $event)"
+                      [ngModel]="userForm().canAssignToUser"
+                      (ngModelChange)="updateFormField('canAssignToUser', $event)"
                       [ngModelOptions]="{standalone: true}"
                     />
-                    <span>Assign / unassign project</span>
+                    <span>Assign to user</span>
                   </label>
                 </div>
               }

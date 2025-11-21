@@ -14,7 +14,7 @@ import { Router } from '@angular/router';
 import { CameraHistoryComponent } from '@features/camera-history/pages/camera-history/camera-history.component';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { combineLatest, forkJoin, of, Observable } from 'rxjs';
-import { catchError, finalize, map } from 'rxjs/operators';
+import { catchError, finalize, map, switchMap } from 'rxjs/operators';
 import { environment } from '@env';
 import {
   Camera,
@@ -50,7 +50,7 @@ type CameraStatus =
   | 'maintenance_long_time'
   | 'finished';
 
-type CameraStatusFilter = 'all' | CameraStatus | 'maintenance_less_images' | 'maintenance_photo_dirty' | 'maintenance_better_view' | 'device_expired' | 'memory_full';
+type CameraStatusFilter = 'all' | CameraStatus | 'maintenance_less_images' | 'maintenance_photo_dirty' | 'maintenance_better_view' | 'maintenance_wrong_time' | 'maintenance_shutter_expiry' | 'device_expired' | 'memory_full';
 
 interface CountryOption {
   value: string;
@@ -99,11 +99,22 @@ interface CameraViewModel {
   wrongTimeMarkedAt?: string;
   wrongTimeRemovedBy?: string;
   wrongTimeRemovedAt?: string;
+  maintenanceStatusShutterExpiry?: boolean;
+  shutterExpiryMarkedBy?: string;
+  shutterExpiryMarkedAt?: string;
+  shutterExpiryRemovedBy?: string;
+  shutterExpiryRemovedAt?: string;
+  maintenanceStatusDeviceExpiry?: boolean;
+  deviceExpiryMarkedBy?: string;
+  deviceExpiryMarkedAt?: string;
+  deviceExpiryRemovedBy?: string;
+  deviceExpiryRemovedAt?: string;
   lastMaintenanceCompletedAt?: Date | null;
   maintenanceCycleStartDate?: Date | null;
   // Memory information
   memoryAvailable?: string;
   hasMemoryAssigned?: boolean;
+  shutterCount?: number;
 }
 
 interface CameraHierarchyEntry {
@@ -233,7 +244,7 @@ export class CameraMonitorComponent implements OnInit {
   readonly projectInfoState = signal<ProjectInfoState | null>(null);
   readonly editCountryModal = signal<EditCountryModalState | null>(null);
   readonly cameraHistoryModalCameraId = signal<string | null>(null);
-  readonly statusHistoryModal = signal<{ cameraId: string; statusType: 'photoDirty' | 'betterView' | 'lowImages' | 'wrongTime' } | null>(null);
+  readonly statusHistoryModal = signal<{ cameraId: string; statusType: 'photoDirty' | 'betterView' | 'lowImages' | 'wrongTime' | 'shutterExpiry' | 'deviceExpiry' } | null>(null);
   readonly statusHistory = signal<CameraStatusHistory[]>([]);
   readonly statusHistoryLoading = signal(false);
 
@@ -242,6 +253,24 @@ export class CameraMonitorComponent implements OnInit {
   readonly cameraCountryUpdating = signal<Set<string>>(new Set());
   readonly cameraHealthData = signal<Map<string, CameraHealthResponse | null>>(new Map());
   readonly cameraMemoryMap = signal<Map<string, Memory>>(new Map());
+  readonly cameraStatusHistoryData = signal<Map<string, {
+    currentStatus: {
+      photoDirty: boolean;
+      betterView: boolean;
+      lowImages: boolean;
+      wrongTime: boolean;
+      shutterExpiry: boolean;
+      deviceExpiry: boolean;
+    };
+    statusMetadata: {
+      photoDirty: any;
+      betterView: any;
+      lowImages: any;
+      wrongTime: any;
+      shutterExpiry: any;
+      deviceExpiry: any;
+    };
+  }>>(new Map());
   readonly globalMaintenanceCycleStartDate = signal<Date | null>(null);
 
   readonly taskTypes = [...LEGACY_TASK_TYPES];
@@ -705,30 +734,18 @@ export class CameraMonitorComponent implements OnInit {
           return of<Camera | null>(null);
         }),
       )
-      .subscribe((updated) => {
-        if (!updated) {
-          return;
-        }
-
-        const maintenanceStatus = (updated.maintenanceStatus ?? {}) as {
-          photoDirty?: boolean;
-          lowImages?: boolean;
-          betterView?: boolean;
-          photoDirtyMarkedBy?: string;
-          photoDirtyMarkedAt?: string;
-          photoDirtyRemovedBy?: string;
-          photoDirtyRemovedAt?: string;
-          betterViewMarkedBy?: string;
-          betterViewMarkedAt?: string;
-          betterViewRemovedBy?: string;
-          betterViewRemovedAt?: string;
-        };
+      .pipe(
+        switchMap(() => this.cameraService.getCurrentStatusFromHistory(camera.id)),
+      )
+      .subscribe((statusData) => {
+        const currentStatus = statusData.currentStatus;
+        const statusMetadata = statusData.statusMetadata;
 
         this.cameraRecords.update((list) =>
           list.map((item) =>
             item.id === camera.id
               ? (() => {
-                  const isPhotoDirty = !!maintenanceStatus.photoDirty;
+                  const isPhotoDirty = currentStatus.photoDirty;
                   const projectStatusNormalized = this.normalizeProjectStatus(item.projectStatus);
                   const updatedStatusRaw = this.normalizeCameraStatusRaw(
                     item.camera.status as string | undefined,
@@ -743,9 +760,9 @@ export class CameraMonitorComponent implements OnInit {
                     isPhotoDirty,
                     item.lastMaintenanceCompletedAt ?? null,
                     item.maintenanceCycleStartDate ?? null,
-                    item.maintenanceStatusLowImages ?? false,
-                    item.maintenanceStatusBetterView ?? false,
-                    item.maintenanceStatusWrongTime ?? false,
+                    currentStatus.lowImages,
+                    currentStatus.betterView,
+                    currentStatus.wrongTime,
                     hasLowMem,
                   );
                   return {
@@ -753,11 +770,10 @@ export class CameraMonitorComponent implements OnInit {
                     cameraStatusRaw: updatedStatusRaw,
                     status: derivedStatus,
                     maintenanceStatusPhotoDirty: isPhotoDirty,
-                    photoDirtyMarkedBy: maintenanceStatus.photoDirtyMarkedBy,
-                    photoDirtyMarkedAt: maintenanceStatus.photoDirtyMarkedAt,
-                    photoDirtyRemovedBy: maintenanceStatus.photoDirtyRemovedBy,
-                    photoDirtyRemovedAt: maintenanceStatus.photoDirtyRemovedAt,
-                    camera: { ...item.camera, maintenanceStatus },
+                    photoDirtyMarkedBy: statusMetadata.photoDirty?.markedBy ?? undefined,
+                    photoDirtyMarkedAt: statusMetadata.photoDirty?.markedAt ?? undefined,
+                    photoDirtyRemovedBy: statusMetadata.photoDirty?.removedBy ?? undefined,
+                    photoDirtyRemovedAt: statusMetadata.photoDirty?.removedAt ?? undefined,
                   };
                 })()
               : item,
@@ -765,7 +781,7 @@ export class CameraMonitorComponent implements OnInit {
         );
 
         this.showToast(
-          maintenanceStatus.photoDirty ? 'Marked as photo dirty.' : 'Photo dirty status cleared.',
+          currentStatus.photoDirty ? 'Marked as photo dirty.' : 'Photo dirty status cleared.',
           'success',
         );
         
@@ -789,30 +805,18 @@ export class CameraMonitorComponent implements OnInit {
           return of<Camera | null>(null);
         }),
       )
-      .subscribe((updated) => {
-        if (!updated) {
-          return;
-        }
-
-        const maintenanceStatus = (updated.maintenanceStatus ?? {}) as {
-          photoDirty?: boolean;
-          lowImages?: boolean;
-          betterView?: boolean;
-          photoDirtyMarkedBy?: string;
-          photoDirtyMarkedAt?: string;
-          photoDirtyRemovedBy?: string;
-          photoDirtyRemovedAt?: string;
-          betterViewMarkedBy?: string;
-          betterViewMarkedAt?: string;
-          betterViewRemovedBy?: string;
-          betterViewRemovedAt?: string;
-        };
+      .pipe(
+        switchMap(() => this.cameraService.getCurrentStatusFromHistory(camera.id)),
+      )
+      .subscribe((statusData) => {
+        const currentStatus = statusData.currentStatus;
+        const statusMetadata = statusData.statusMetadata;
 
         this.cameraRecords.update((list) =>
           list.map((item) =>
             item.id === camera.id
               ? (() => {
-                  const isBetterView = !!maintenanceStatus.betterView;
+                  const isBetterView = currentStatus.betterView;
                   const projectStatusNormalized = this.normalizeProjectStatus(item.projectStatus);
                   const updatedStatusRaw = this.normalizeCameraStatusRaw(
                     item.camera.status as string | undefined,
@@ -824,12 +828,12 @@ export class CameraMonitorComponent implements OnInit {
                     updatedStatusRaw,
                     item.lastUpdatedAt,
                     health,
-                    item.maintenanceStatusPhotoDirty ?? false,
+                    currentStatus.photoDirty,
                     item.lastMaintenanceCompletedAt ?? null,
                     item.maintenanceCycleStartDate ?? null,
-                    item.maintenanceStatusLowImages ?? false,
-                    item.maintenanceStatusBetterView ?? false,
-                    item.maintenanceStatusWrongTime ?? false,
+                    currentStatus.lowImages,
+                    isBetterView,
+                    currentStatus.wrongTime,
                     hasLowMem,
                   );
                   return {
@@ -837,11 +841,10 @@ export class CameraMonitorComponent implements OnInit {
                     cameraStatusRaw: updatedStatusRaw,
                     status: derivedStatus,
                     maintenanceStatusBetterView: isBetterView,
-                    betterViewMarkedBy: maintenanceStatus.betterViewMarkedBy,
-                    betterViewMarkedAt: maintenanceStatus.betterViewMarkedAt,
-                    betterViewRemovedBy: maintenanceStatus.betterViewRemovedBy,
-                    betterViewRemovedAt: maintenanceStatus.betterViewRemovedAt,
-                    camera: { ...item.camera, maintenanceStatus },
+                    betterViewMarkedBy: statusMetadata.betterView?.markedBy ?? undefined,
+                    betterViewMarkedAt: statusMetadata.betterView?.markedAt ?? undefined,
+                    betterViewRemovedBy: statusMetadata.betterView?.removedBy ?? undefined,
+                    betterViewRemovedAt: statusMetadata.betterView?.removedAt ?? undefined,
                   };
                 })()
               : item,
@@ -849,7 +852,7 @@ export class CameraMonitorComponent implements OnInit {
         );
 
         this.showToast(
-          maintenanceStatus.betterView ? 'Marked as better view.' : 'Better view status cleared.',
+          currentStatus.betterView ? 'Marked as better view.' : 'Better view status cleared.',
           'success',
         );
         
@@ -1313,7 +1316,7 @@ export class CameraMonitorComponent implements OnInit {
     this.cameraHistoryModalCameraId.set(null);
   }
 
-  openStatusHistory(camera: CameraViewModel, statusType: 'photoDirty' | 'betterView' | 'lowImages' | 'wrongTime'): void {
+  openStatusHistory(camera: CameraViewModel, statusType: 'photoDirty' | 'betterView' | 'lowImages' | 'wrongTime' | 'shutterExpiry' | 'deviceExpiry'): void {
     this.statusHistoryModal.set({ cameraId: camera.id, statusType });
     this.loadStatusHistory(camera.id, statusType);
   }
@@ -1323,7 +1326,7 @@ export class CameraMonitorComponent implements OnInit {
     this.statusHistory.set([]);
   }
 
-  loadStatusHistory(cameraId: string, statusType: 'photoDirty' | 'betterView' | 'lowImages' | 'wrongTime'): void {
+  loadStatusHistory(cameraId: string, statusType: 'photoDirty' | 'betterView' | 'lowImages' | 'wrongTime' | 'shutterExpiry' | 'deviceExpiry'): void {
     this.statusHistoryLoading.set(true);
     this.cameraService
       .getStatusHistory(cameraId)
@@ -1454,14 +1457,16 @@ export class CameraMonitorComponent implements OnInit {
         const initialRecords = this.buildCameraRecords(filteredCameras, filteredDevelopers, projects, lastPictures);
         this.cameraRecords.set(initialRecords);
 
-        // Fetch health data (for all cameras with valid tags) and maintenance summaries in the background
+        // Fetch health data, status history, and maintenance summaries in the background
         forkJoin({
           health: this.fetchCameraHealthData(initialRecords),
+          statusHistory: this.fetchCameraStatusHistory(filteredCameras),
           maintenance: this.fetchMaintenanceSummaries(cameras),
         })
           .pipe(takeUntilDestroyed(this.destroyRef))
-          .subscribe(({ health, maintenance }) => {
+          .subscribe(({ health, statusHistory, maintenance }) => {
             this.cameraHealthData.set(health);
+            this.cameraStatusHistoryData.set(statusHistory);
             // Use filtered cameras and developers for the final build
             const user = this.currentUser();
             let finalCameras = cameras;
@@ -1483,6 +1488,7 @@ export class CameraMonitorComponent implements OnInit {
                 projects,
                 lastPictures,
                 health,
+                statusHistory,
                 maintenance,
               ),
             );
@@ -1529,6 +1535,72 @@ export class CameraMonitorComponent implements OnInit {
         }
         this.globalMaintenanceCycleStartDate.set(null);
       });
+  }
+
+  private fetchCameraStatusHistory(
+    cameras: Camera[],
+  ): Observable<Map<string, {
+    currentStatus: {
+      photoDirty: boolean;
+      betterView: boolean;
+      lowImages: boolean;
+      wrongTime: boolean;
+      shutterExpiry: boolean;
+      deviceExpiry: boolean;
+    };
+    statusMetadata: {
+      photoDirty: any;
+      betterView: any;
+      lowImages: any;
+      wrongTime: any;
+      shutterExpiry: any;
+      deviceExpiry: any;
+    };
+  }>> {
+    const requests: Record<string, Observable<any>> = {};
+
+    for (const camera of cameras) {
+      if (camera._id) {
+        requests[camera._id] = this.cameraService
+          .getCurrentStatusFromHistory(camera._id)
+          .pipe(catchError(() => of({
+            currentStatus: {
+              photoDirty: false,
+              betterView: false,
+              lowImages: false,
+              wrongTime: false,
+              shutterExpiry: false,
+              deviceExpiry: false,
+            },
+            statusMetadata: {
+              photoDirty: null,
+              betterView: null,
+              lowImages: null,
+              wrongTime: null,
+              shutterExpiry: null,
+              deviceExpiry: null,
+            },
+          })));
+      }
+    }
+
+    if (Object.keys(requests).length === 0) {
+      return of(new Map());
+    }
+
+    return forkJoin(requests).pipe(
+      map((results) => {
+        const statusMap = new Map<string, any>();
+        for (const [cameraId, value] of Object.entries(results)) {
+          statusMap.set(cameraId, value);
+        }
+        return statusMap;
+      }),
+      catchError((error) => {
+        console.error('Failed to fetch camera status history', error);
+        return of(new Map());
+      }),
+    );
   }
 
   private fetchCameraHealthData(
@@ -1625,6 +1697,24 @@ export class CameraMonitorComponent implements OnInit {
     projects: Project[],
     lastPictures: CameraLastPicture[],
     healthData?: Map<string, CameraHealthResponse | null>,
+    statusHistoryData?: Map<string, {
+      currentStatus: {
+        photoDirty: boolean;
+        betterView: boolean;
+        lowImages: boolean;
+        wrongTime: boolean;
+        shutterExpiry: boolean;
+        deviceExpiry: boolean;
+      };
+      statusMetadata: {
+        photoDirty: any;
+        betterView: any;
+        lowImages: any;
+        wrongTime: any;
+        shutterExpiry: any;
+        deviceExpiry: any;
+      };
+    }>,
     maintenanceSummaries?: Map<string, Date | null>,
   ): CameraViewModel[] {
     const memoryMap = this.cameraMemoryMap();
@@ -1659,31 +1749,59 @@ export class CameraMonitorComponent implements OnInit {
       const projectStatusNormalized = this.normalizeProjectStatus(project?.status);
       const cameraStatusRaw = this.normalizeCameraStatusRaw(camera.status);
       const health = healthData?.get(camera._id) ?? null;
-      const maintenanceStatus = camera.maintenanceStatus as
-        | { photoDirty?: boolean; lowImages?: boolean; betterView?: boolean; wrongTime?: boolean; photoDirtyMarkedBy?: string; photoDirtyMarkedAt?: string; photoDirtyRemovedBy?: string; photoDirtyRemovedAt?: string; betterViewMarkedBy?: string; betterViewMarkedAt?: string; betterViewRemovedBy?: string; betterViewRemovedAt?: string; lowImagesMarkedBy?: string; lowImagesMarkedAt?: string; lowImagesRemovedBy?: string; lowImagesRemovedAt?: string; wrongTimeMarkedBy?: string; wrongTimeMarkedAt?: string; wrongTimeRemovedBy?: string; wrongTimeRemovedAt?: string }
-        | undefined;
-      const maintenanceStatusPhotoDirty = !!maintenanceStatus?.photoDirty;
-      const maintenanceStatusLowImages = !!maintenanceStatus?.lowImages;
-      // maintenanceLowImages is now automatically set by backend based on yesterday's count < 40
+      
+      // Get status from history instead of camera.maintenanceStatus
+      const statusHistory = statusHistoryData?.get(camera._id);
+      const currentStatus = statusHistory?.currentStatus ?? {
+        photoDirty: false,
+        betterView: false,
+        lowImages: false,
+        wrongTime: false,
+        shutterExpiry: false,
+        deviceExpiry: false,
+      };
+      const statusMetadata = statusHistory?.statusMetadata ?? {
+        photoDirty: null,
+        betterView: null,
+        lowImages: null,
+        wrongTime: null,
+        shutterExpiry: null,
+        deviceExpiry: null,
+      };
+      
+      const maintenanceStatusPhotoDirty = currentStatus.photoDirty;
+      const maintenanceStatusLowImages = currentStatus.lowImages;
       const maintenanceLowImages = maintenanceStatusLowImages;
-      const maintenanceStatusBetterView = !!maintenanceStatus?.betterView;
-      const photoDirtyMarkedBy = maintenanceStatus?.photoDirtyMarkedBy;
-      const photoDirtyMarkedAt = maintenanceStatus?.photoDirtyMarkedAt;
-      const photoDirtyRemovedBy = maintenanceStatus?.photoDirtyRemovedBy;
-      const photoDirtyRemovedAt = maintenanceStatus?.photoDirtyRemovedAt;
-      const betterViewMarkedBy = maintenanceStatus?.betterViewMarkedBy;
-      const betterViewMarkedAt = maintenanceStatus?.betterViewMarkedAt;
-      const betterViewRemovedBy = maintenanceStatus?.betterViewRemovedBy;
-      const betterViewRemovedAt = maintenanceStatus?.betterViewRemovedAt;
-      const lowImagesMarkedBy = maintenanceStatus?.lowImagesMarkedBy;
-      const lowImagesMarkedAt = maintenanceStatus?.lowImagesMarkedAt;
-      const lowImagesRemovedBy = maintenanceStatus?.lowImagesRemovedBy;
-      const lowImagesRemovedAt = maintenanceStatus?.lowImagesRemovedAt;
-      const maintenanceStatusWrongTime = !!maintenanceStatus?.wrongTime;
-      const wrongTimeMarkedBy = maintenanceStatus?.wrongTimeMarkedBy;
-      const wrongTimeMarkedAt = maintenanceStatus?.wrongTimeMarkedAt;
-      const wrongTimeRemovedBy = maintenanceStatus?.wrongTimeRemovedBy;
-      const wrongTimeRemovedAt = maintenanceStatus?.wrongTimeRemovedAt;
+      const maintenanceStatusBetterView = currentStatus.betterView;
+      const photoDirtyMarkedBy = statusMetadata.photoDirty?.markedBy ?? undefined;
+      const photoDirtyMarkedAt = statusMetadata.photoDirty?.markedAt ?? undefined;
+      const photoDirtyRemovedBy = statusMetadata.photoDirty?.removedBy ?? undefined;
+      const photoDirtyRemovedAt = statusMetadata.photoDirty?.removedAt ?? undefined;
+      const betterViewMarkedBy = statusMetadata.betterView?.markedBy ?? undefined;
+      const betterViewMarkedAt = statusMetadata.betterView?.markedAt ?? undefined;
+      const betterViewRemovedBy = statusMetadata.betterView?.removedBy ?? undefined;
+      const betterViewRemovedAt = statusMetadata.betterView?.removedAt ?? undefined;
+      const lowImagesMarkedBy = statusMetadata.lowImages?.markedBy ?? undefined;
+      const lowImagesMarkedAt = statusMetadata.lowImages?.markedAt ?? undefined;
+      const lowImagesRemovedBy = statusMetadata.lowImages?.removedBy ?? undefined;
+      const lowImagesRemovedAt = statusMetadata.lowImages?.removedAt ?? undefined;
+      const maintenanceStatusWrongTime = currentStatus.wrongTime;
+      const wrongTimeMarkedBy = statusMetadata.wrongTime?.markedBy ?? undefined;
+      const wrongTimeMarkedAt = statusMetadata.wrongTime?.markedAt ?? undefined;
+      const wrongTimeRemovedBy = statusMetadata.wrongTime?.removedBy ?? undefined;
+      const wrongTimeRemovedAt = statusMetadata.wrongTime?.removedAt ?? undefined;
+      // Get shutter expiry from health response (preferred) or status history
+      const maintenanceStatusShutterExpiry = health?.hasShutterExpiry ?? currentStatus.shutterExpiry;
+      const shutterExpiryMarkedBy = statusMetadata.shutterExpiry?.markedBy ?? undefined;
+      const shutterExpiryMarkedAt = statusMetadata.shutterExpiry?.markedAt ?? undefined;
+      const shutterExpiryRemovedBy = statusMetadata.shutterExpiry?.removedBy ?? undefined;
+      const shutterExpiryRemovedAt = statusMetadata.shutterExpiry?.removedAt ?? undefined;
+      // Get device expiry from health response (preferred) or status history
+      const maintenanceStatusDeviceExpiry = health?.hasDeviceExpired ?? currentStatus.deviceExpiry;
+      const deviceExpiryMarkedBy = statusMetadata.deviceExpiry?.markedBy ?? undefined;
+      const deviceExpiryMarkedAt = statusMetadata.deviceExpiry?.markedAt ?? undefined;
+      const deviceExpiryRemovedBy = statusMetadata.deviceExpiry?.removedBy ?? undefined;
+      const deviceExpiryRemovedAt = statusMetadata.deviceExpiry?.removedAt ?? undefined;
       const lastMaintenanceCompletedAt = maintenanceSummaries?.get(camera._id) ?? null;
       let maintenanceCycleStartDate: Date | null = null;
       if (camera.maintenanceCycleStartDate) {
@@ -1699,16 +1817,26 @@ export class CameraMonitorComponent implements OnInit {
       const maintenanceReferenceDate = lastMaintenanceCompletedAt ?? maintenanceCycleStartDate;
       
       // Get memory information from health response (backend checks memory module)
-      // Fallback to memoryMap if health doesn't have memory info (for backward compatibility)
+      // The backend always includes hasMemoryAssigned (true or false) in the response
       let memoryAvailable: string | undefined;
-      let hasMemoryAssigned: boolean;
+      let hasMemoryAssigned: boolean = false;
+      let shutterCount: number | undefined;
       
+      // Use memory info from health response (backend is the source of truth)
       if (health?.hasMemoryAssigned !== undefined) {
-        // Use memory info from health response (preferred)
         hasMemoryAssigned = health.hasMemoryAssigned;
         memoryAvailable = health.memoryAvailable ?? undefined;
-      } else {
-        // Fallback: try to find memory from memoryMap (for backward compatibility)
+        // Get shutter count from health response (preferred)
+        if (health.shutterCount !== undefined && health.shutterCount !== null) {
+          shutterCount = typeof health.shutterCount === 'number' ? health.shutterCount : Number(health.shutterCount);
+          if (isNaN(shutterCount)) {
+            shutterCount = undefined;
+          }
+        }
+      }
+      
+      // Fallback: get memory object from memoryMap if health doesn't have shutter count
+      if (hasMemoryAssigned && shutterCount === undefined) {
         const developerTag = (developer?.developerTag || '').toString().trim().toLowerCase();
         const projectTag = (project?.projectTag || '').toString().trim().toLowerCase();
         const cameraName = (camera.camera || '').toString().trim().toLowerCase();
@@ -1730,8 +1858,22 @@ export class CameraMonitorComponent implements OnInit {
           }
         }
         
-        memoryAvailable = memory?.memoryAvailable;
-        hasMemoryAssigned = !!memory;
+        // Extract shutter count from memory object if available
+        if (memory) {
+          const shutterValue = memory.shuttercount ?? memory['shutterCount'];
+          if (shutterValue !== undefined && shutterValue !== null) {
+            if (typeof shutterValue === 'number') {
+              shutterCount = shutterValue;
+            } else if (typeof shutterValue === 'string') {
+              // Remove commas and other formatting characters before parsing
+              const cleaned = shutterValue.replace(/[,.\s]/g, '');
+              const parsed = Number(cleaned);
+              shutterCount = isNaN(parsed) ? undefined : parsed;
+            } else {
+              shutterCount = undefined;
+            }
+          }
+        }
       }
       
       // Check if memory capacity is low (< 10GB)
@@ -1754,6 +1896,8 @@ export class CameraMonitorComponent implements OnInit {
         maintenanceStatusBetterView,
         maintenanceStatusWrongTime,
         hasLowMemoryCapacity,
+        maintenanceStatusShutterExpiry, // hasShutterExpiry parameter
+        maintenanceStatusDeviceExpiry, // hasDeviceExpiry parameter
       );
       const country = (camera.country ?? '').trim();
 
@@ -1800,8 +1944,19 @@ export class CameraMonitorComponent implements OnInit {
         wrongTimeMarkedAt,
         wrongTimeRemovedBy,
         wrongTimeRemovedAt,
+        maintenanceStatusShutterExpiry,
+        shutterExpiryMarkedBy,
+        shutterExpiryMarkedAt,
+        shutterExpiryRemovedBy,
+        shutterExpiryRemovedAt,
+        maintenanceStatusDeviceExpiry,
+        deviceExpiryMarkedBy,
+        deviceExpiryMarkedAt,
+        deviceExpiryRemovedBy,
+        deviceExpiryRemovedAt,
         memoryAvailable,
         hasMemoryAssigned,
+        shutterCount,
       };
     });
   }
@@ -2098,6 +2253,8 @@ export class CameraMonitorComponent implements OnInit {
     hasBetterView = false,
     hasWrongTime = false,
     hasLowMemory = false,
+    hasShutterExpiry = false,
+    hasDeviceExpiry = false,
   ): CameraStatus {
     // 1) Finished always wins
     if (cameraStatusRaw === 'finished') {
@@ -2142,7 +2299,7 @@ export class CameraMonitorComponent implements OnInit {
       projectStatus === 'maintenance' || projectStatus === 'maintenance_hold';
 
     const hasAnyMaintenanceReason =
-      projectMaintenance || hasLowImages || hasPhotoDirty || hasBetterView || hasWrongTime || hasLowMemory || isLongTime;
+      projectMaintenance || hasLowImages || hasPhotoDirty || hasBetterView || hasWrongTime || hasLowMemory || hasShutterExpiry || hasDeviceExpiry || isLongTime;
 
     // 4) If there is no maintenance reason at all → stay Online
     if (!hasAnyMaintenanceReason) {
@@ -2209,6 +2366,24 @@ export class CameraMonitorComponent implements OnInit {
       return isEligibleStatus && !!camera.maintenanceStatusBetterView;
     }
 
+    // Virtual filter: maintenance / wrong time
+    if (status === 'maintenance_wrong_time') {
+      const isMaintenanceStatus =
+        camera.status === 'maintenance' ||
+        camera.status === 'maintenance_long_time' ||
+        camera.status === 'maintenance_hold';
+      return isMaintenanceStatus && !!camera.maintenanceStatusWrongTime;
+    }
+
+    // Virtual filter: maintenance / shutter expiry
+    if (status === 'maintenance_shutter_expiry') {
+      const isMaintenanceStatus =
+        camera.status === 'maintenance' ||
+        camera.status === 'maintenance_long_time' ||
+        camera.status === 'maintenance_hold';
+      return isMaintenanceStatus && !!camera.maintenanceStatusShutterExpiry;
+    }
+
     // Virtual filter: device expired (under maintenance)
     if (status === 'device_expired') {
       // Only show cameras that are in maintenance status AND device is expired
@@ -2217,23 +2392,8 @@ export class CameraMonitorComponent implements OnInit {
       if (!isMaintenanceStatus) {
         return false;
       }
-      // Check if device is expired based on installedDate or expiration date
-      const cameraData = camera.camera;
-      if (cameraData.installedDate) {
-        const installedDate = new Date(cameraData.installedDate);
-        const now = new Date();
-        // Assuming device expires after a certain period (e.g., 5 years)
-        // This logic should be adjusted based on actual requirements
-        const expirationPeriod = 5 * 365 * 24 * 60 * 60 * 1000; // 5 years in milliseconds
-        const expirationDate = new Date(installedDate.getTime() + expirationPeriod);
-        return now > expirationDate;
-      }
-      // Check for explicit expiration date if available
-      const expirationDate = (cameraData as any).expirationDate || (cameraData as any).deviceExpirationDate;
-      if (expirationDate) {
-        return new Date() > new Date(expirationDate);
-      }
-      return false;
+      // Use the device expiry status from backend
+      return camera.maintenanceStatusDeviceExpiry === true;
     }
 
     // Virtual filter: memory full (under maintenance)

@@ -83,7 +83,7 @@ export class CameraService {
     return this.http.get<CameraLastPicture[]>(`${this.baseUrl}/pics/last`);
   }
 
-  create(payload: Partial<Camera>): Observable<Camera> {
+  create(payload: Partial<Camera> | FormData): Observable<Camera> {
     return this.http.post<Camera>(this.baseUrl, payload).pipe(
       tap(() => {
         this.clearCache();
@@ -91,7 +91,7 @@ export class CameraService {
     );
   }
 
-  update(cameraId: string, payload: Partial<Camera>): Observable<Camera> {
+  update(cameraId: string, payload: Partial<Camera> | FormData): Observable<Camera> {
     return this.http.put<Camera>(`${this.baseUrl}/${cameraId}`, payload).pipe(
       tap(() => {
         this.clearCache();
@@ -143,13 +143,25 @@ export class CameraService {
     cameraName: string,
   ): Observable<CameraHealthResponse | null> {
     if (!developerTag || !projectTag || !cameraName) {
-      return of(null);
+      return of({ 
+        developerId: developerTag, 
+        projectId: projectTag, 
+        cameraId: cameraName, 
+        totalImages: 0,
+        error: 'Missing required parameters' 
+      } as CameraHealthResponse);
     }
     const url = `${this.healthBase}health/camera/${encodeURIComponent(developerTag)}/${encodeURIComponent(projectTag)}/${encodeURIComponent(cameraName)}`;
     return this.http.get<CameraHealthResponse>(url).pipe(
-      catchError(() => {
-        // Return null if health check fails (camera might not exist, etc.)
-        return of(null);
+      catchError((error) => {
+        // Return error response instead of null so the UI can display it
+        return of({ 
+          developerId: developerTag, 
+          projectId: projectTag, 
+          cameraId: cameraName, 
+          totalImages: 0,
+          error: error?.error?.error || error?.message || 'Health data unavailable' 
+        } as CameraHealthResponse);
       }),
     );
   }
@@ -182,8 +194,95 @@ export class CameraService {
     return this.http.get<CameraStatusHistory[]>(`${environment.apiUrl}/camera-status-history`);
   }
 
+  getCurrentStatusFromHistory(cameraId: string): Observable<{
+    currentStatus: {
+      photoDirty: boolean;
+      betterView: boolean;
+      lowImages: boolean;
+      wrongTime: boolean;
+      shutterExpiry: boolean;
+      deviceExpiry: boolean;
+    };
+    statusMetadata: {
+      photoDirty: {
+        isActive: boolean;
+        markedBy: string | null;
+        markedAt: string | null;
+        markedByEmail: string | null;
+        removedBy: string | null;
+        removedAt: string | null;
+        removedByEmail: string | null;
+      } | null;
+      betterView: {
+        isActive: boolean;
+        markedBy: string | null;
+        markedAt: string | null;
+        markedByEmail: string | null;
+        removedBy: string | null;
+        removedAt: string | null;
+        removedByEmail: string | null;
+      } | null;
+      lowImages: {
+        isActive: boolean;
+        markedBy: string | null;
+        markedAt: string | null;
+        markedByEmail: string | null;
+        removedBy: string | null;
+        removedAt: string | null;
+        removedByEmail: string | null;
+      } | null;
+      wrongTime: {
+        isActive: boolean;
+        markedBy: string | null;
+        markedAt: string | null;
+        markedByEmail: string | null;
+        removedBy: string | null;
+        removedAt: string | null;
+        removedByEmail: string | null;
+      } | null;
+      shutterExpiry: {
+        isActive: boolean;
+        markedBy: string | null;
+        markedAt: string | null;
+        markedByEmail: string | null;
+        removedBy: string | null;
+        removedAt: string | null;
+        removedByEmail: string | null;
+      } | null;
+      deviceExpiry: {
+        isActive: boolean;
+        markedBy: string | null;
+        markedAt: string | null;
+        markedByEmail: string | null;
+        removedBy: string | null;
+        removedAt: string | null;
+        removedByEmail: string | null;
+      } | null;
+    };
+  }> {
+    return this.http.get<{
+      currentStatus: {
+        photoDirty: boolean;
+        betterView: boolean;
+        lowImages: boolean;
+        wrongTime: boolean;
+        shutterExpiry: boolean;
+        deviceExpiry: boolean;
+      };
+      statusMetadata: any;
+    }>(`${environment.apiUrl}/camera-status-history/${cameraId}/current-status`);
+  }
+
   getMaintenanceCycleStartDate(): Observable<{ cycleStartDate: string | null }> {
     return this.http.get<{ cycleStartDate: string | null }>(`${this.baseUrl}/maintenance-cycle/start-date`);
+  }
+
+  deleteInternalAttachment(cameraId: string, attachmentId: string): Observable<Camera> {
+    return this.http.delete<Camera>(`${this.baseUrl}/${cameraId}/internal-attachments/${attachmentId}`).pipe(
+      tap(() => {
+        this.clearCache();
+      }),
+    );
   }
 
   clearCache(): void {

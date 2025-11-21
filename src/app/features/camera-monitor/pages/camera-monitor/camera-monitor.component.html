@@ -180,6 +180,8 @@
             selectedCameraStatus() === 'maintenance_less_images' ||
             selectedCameraStatus() === 'maintenance_photo_dirty' ||
             selectedCameraStatus() === 'maintenance_better_view' ||
+            selectedCameraStatus() === 'maintenance_wrong_time' ||
+            selectedCameraStatus() === 'maintenance_shutter_expiry' ||
             selectedCameraStatus() === 'device_expired' ||
             selectedCameraStatus() === 'memory_full'
           ) {
@@ -246,6 +248,30 @@
                 (click)="onStatusSelect('maintenance_better_view')"
               >
                 Better view
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition"
+                [ngClass]="
+                  selectedCameraStatus() === 'maintenance_wrong_time'
+                    ? 'border-orange-500 bg-orange-500 text-white'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                "
+                (click)="onStatusSelect('maintenance_wrong_time')"
+              >
+                Wrong time
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition"
+                [ngClass]="
+                  selectedCameraStatus() === 'maintenance_shutter_expiry'
+                    ? 'border-red-500 bg-red-500 text-white'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                "
+                (click)="onStatusSelect('maintenance_shutter_expiry')"
+              >
+                Shutter expiry
               </button>
               <button
                 type="button"
@@ -555,7 +581,12 @@
                                 }
                               </button>
                             }
-                            @if (camera.maintenanceStatusWrongTime) {
+                            @if (
+                              (camera.status === 'maintenance' ||
+                                camera.status === 'maintenance_hold' ||
+                                camera.status === 'maintenance_long_time') &&
+                              camera.maintenanceStatusWrongTime
+                            ) {
                               <button
                                 type="button"
                                 class="inline-flex items-center rounded-full border border-orange-300 bg-orange-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700 transition hover:border-orange-400 hover:bg-orange-100 cursor-pointer"
@@ -570,6 +601,51 @@
                                       by {{ camera.wrongTimeMarkedBy }}
                                     } @else if (camera.wrongTimeMarkedAt) {
                                       on {{ camera.wrongTimeMarkedAt | date: 'short' }}
+                                    }
+                                  </span>
+                                }
+                              </button>
+                            }
+                            @if (
+                              (camera.status === 'maintenance' ||
+                                camera.status === 'maintenance_hold' ||
+                                camera.status === 'maintenance_long_time') &&
+                              camera.maintenanceStatusShutterExpiry
+                            ) {
+                              <button
+                                type="button"
+                                class="inline-flex items-center rounded-full border border-red-300 bg-red-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 transition hover:border-red-400 hover:bg-red-100 cursor-pointer"
+                                (click)="openStatusHistory(camera, 'shutterExpiry')"
+                              >
+                                Shutter expiry
+                                @if (camera.shutterExpiryMarkedBy || camera.shutterExpiryMarkedAt) {
+                                  <span class="ml-1.5 text-[9px] normal-case text-red-600">
+                                    @if (camera.shutterExpiryMarkedBy && camera.shutterExpiryMarkedAt) {
+                                      by {{ camera.shutterExpiryMarkedBy }} on {{ camera.shutterExpiryMarkedAt | date: 'short' }}
+                                    } @else if (camera.shutterExpiryMarkedBy) {
+                                      by {{ camera.shutterExpiryMarkedBy }}
+                                    } @else if (camera.shutterExpiryMarkedAt) {
+                                      on {{ camera.shutterExpiryMarkedAt | date: 'short' }}
+                                    }
+                                  </span>
+                                }
+                              </button>
+                            }
+                            @if (camera.maintenanceStatusDeviceExpiry) {
+                              <button
+                                type="button"
+                                class="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 transition hover:border-amber-400 hover:bg-amber-100 cursor-pointer"
+                                (click)="openStatusHistory(camera, 'deviceExpiry')"
+                              >
+                                Device expiry
+                                @if (camera.deviceExpiryMarkedBy || camera.deviceExpiryMarkedAt) {
+                                  <span class="ml-1.5 text-[9px] normal-case text-amber-600">
+                                    @if (camera.deviceExpiryMarkedBy && camera.deviceExpiryMarkedAt) {
+                                      by {{ camera.deviceExpiryMarkedBy }} on {{ camera.deviceExpiryMarkedAt | date: 'short' }}
+                                    } @else if (camera.deviceExpiryMarkedBy) {
+                                      by {{ camera.deviceExpiryMarkedBy }}
+                                    } @else if (camera.deviceExpiryMarkedAt) {
+                                      on {{ camera.deviceExpiryMarkedAt | date: 'short' }}
                                     }
                                   </span>
                                 }
@@ -644,6 +720,12 @@
                               <dd class="text-xs text-slate-500">{{ camera.memoryAvailable || 'Not specified' }}</dd>
                             </div>
                           }
+                          @if (camera.hasMemoryAssigned && camera.shutterCount !== undefined) {
+                            <div class="flex items-center justify-between">
+                              <dt class="font-semibold text-slate-700">Shutter</dt>
+                              <dd class="text-xs text-slate-500">{{ camera.shutterCount | number }}</dd>
+                            </div>
+                          }
                           @if (camera.photoDirtyRemovedBy || camera.photoDirtyRemovedAt) {
                             <div class="flex items-center justify-between">
                               <dt class="font-semibold text-slate-700">Photo dirty removed</dt>
@@ -696,6 +778,34 @@
                                   by {{ camera.wrongTimeRemovedBy }}
                                 } @else if (camera.wrongTimeRemovedAt) {
                                   on {{ camera.wrongTimeRemovedAt | date: 'short' }}
+                                }
+                              </dd>
+                            </div>
+                          }
+                          @if (camera.shutterExpiryRemovedBy || camera.shutterExpiryRemovedAt) {
+                            <div class="flex items-center justify-between">
+                              <dt class="font-semibold text-slate-700">Shutter expiry removed</dt>
+                              <dd class="text-xs text-slate-500">
+                                @if (camera.shutterExpiryRemovedBy && camera.shutterExpiryRemovedAt) {
+                                  by {{ camera.shutterExpiryRemovedBy }} on {{ camera.shutterExpiryRemovedAt | date: 'short' }}
+                                } @else if (camera.shutterExpiryRemovedBy) {
+                                  by {{ camera.shutterExpiryRemovedBy }}
+                                } @else if (camera.shutterExpiryRemovedAt) {
+                                  on {{ camera.shutterExpiryRemovedAt | date: 'short' }}
+                                }
+                              </dd>
+                            </div>
+                          }
+                          @if (camera.deviceExpiryRemovedBy || camera.deviceExpiryRemovedAt) {
+                            <div class="flex items-center justify-between">
+                              <dt class="font-semibold text-slate-700">Device expiry removed</dt>
+                              <dd class="text-xs text-slate-500">
+                                @if (camera.deviceExpiryRemovedBy && camera.deviceExpiryRemovedAt) {
+                                  by {{ camera.deviceExpiryRemovedBy }} on {{ camera.deviceExpiryRemovedAt | date: 'short' }}
+                                } @else if (camera.deviceExpiryRemovedBy) {
+                                  by {{ camera.deviceExpiryRemovedBy }}
+                                } @else if (camera.deviceExpiryRemovedAt) {
+                                  on {{ camera.deviceExpiryRemovedAt | date: 'short' }}
                                 }
                               </dd>
                             </div>
@@ -1010,7 +1120,12 @@
                     }
                   </button>
                 }
-                @if (camera.maintenanceStatusWrongTime) {
+                @if (
+                  (camera.status === 'maintenance' ||
+                    camera.status === 'maintenance_hold' ||
+                    camera.status === 'maintenance_long_time') &&
+                  camera.maintenanceStatusWrongTime
+                ) {
                   <button
                     type="button"
                     class="inline-flex items-center rounded-full border border-orange-300 bg-orange-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700 transition hover:border-orange-400 hover:bg-orange-100 cursor-pointer"
@@ -1025,6 +1140,56 @@
                           by {{ camera.wrongTimeMarkedBy }}
                         } @else if (camera.wrongTimeMarkedAt) {
                           on {{ camera.wrongTimeMarkedAt | date: 'short' }}
+                        }
+                      </span>
+                    }
+                  </button>
+                }
+                @if (
+                  (camera.status === 'maintenance' ||
+                    camera.status === 'maintenance_hold' ||
+                    camera.status === 'maintenance_long_time') &&
+                  camera.maintenanceStatusShutterExpiry
+                ) {
+                  <button
+                    type="button"
+                    class="inline-flex items-center rounded-full border border-red-300 bg-red-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 transition hover:border-red-400 hover:bg-red-100 cursor-pointer"
+                    (click)="openStatusHistory(camera, 'shutterExpiry')"
+                  >
+                    Shutter expiry
+                    @if (camera.shutterExpiryMarkedBy || camera.shutterExpiryMarkedAt) {
+                      <span class="ml-1.5 text-[9px] normal-case text-red-600">
+                        @if (camera.shutterExpiryMarkedBy && camera.shutterExpiryMarkedAt) {
+                          by {{ camera.shutterExpiryMarkedBy }} on {{ camera.shutterExpiryMarkedAt | date: 'short' }}
+                        } @else if (camera.shutterExpiryMarkedBy) {
+                          by {{ camera.shutterExpiryMarkedBy }}
+                        } @else if (camera.shutterExpiryMarkedAt) {
+                          on {{ camera.shutterExpiryMarkedAt | date: 'short' }}
+                        }
+                      </span>
+                    }
+                  </button>
+                }
+                @if (
+                  (camera.status === 'maintenance' ||
+                    camera.status === 'maintenance_hold' ||
+                    camera.status === 'maintenance_long_time') &&
+                  camera.maintenanceStatusDeviceExpiry
+                ) {
+                  <button
+                    type="button"
+                    class="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 transition hover:border-amber-400 hover:bg-amber-100 cursor-pointer"
+                    (click)="openStatusHistory(camera, 'deviceExpiry')"
+                  >
+                    Device expiry
+                    @if (camera.deviceExpiryMarkedBy || camera.deviceExpiryMarkedAt) {
+                      <span class="ml-1.5 text-[9px] normal-case text-amber-600">
+                        @if (camera.deviceExpiryMarkedBy && camera.deviceExpiryMarkedAt) {
+                          by {{ camera.deviceExpiryMarkedBy }} on {{ camera.deviceExpiryMarkedAt | date: 'short' }}
+                        } @else if (camera.deviceExpiryMarkedBy) {
+                          by {{ camera.deviceExpiryMarkedBy }}
+                        } @else if (camera.deviceExpiryMarkedAt) {
+                          on {{ camera.deviceExpiryMarkedAt | date: 'short' }}
                         }
                       </span>
                     }
@@ -1085,6 +1250,12 @@
                   <dd class="text-xs text-slate-500">{{ camera.memoryAvailable || 'Not specified' }}</dd>
                 </div>
               }
+              @if (camera.hasMemoryAssigned && camera.shutterCount !== undefined) {
+                <div class="flex items-center justify-between">
+                  <dt class="font-semibold text-slate-700">Shutter</dt>
+                  <dd class="text-xs text-slate-500">{{ camera.shutterCount | number }}</dd>
+                </div>
+              }
               @if (camera.photoDirtyRemovedBy || camera.photoDirtyRemovedAt) {
                 <div class="flex items-center justify-between">
                   <dt class="font-semibold text-slate-700">Photo dirty removed</dt>
@@ -1137,6 +1308,34 @@
                       by {{ camera.wrongTimeRemovedBy }}
                     } @else if (camera.wrongTimeRemovedAt) {
                       on {{ camera.wrongTimeRemovedAt | date: 'short' }}
+                    }
+                  </dd>
+                </div>
+              }
+              @if (camera.shutterExpiryRemovedBy || camera.shutterExpiryRemovedAt) {
+                <div class="flex items-center justify-between">
+                  <dt class="font-semibold text-slate-700">Shutter expiry removed</dt>
+                  <dd class="text-xs text-slate-500">
+                    @if (camera.shutterExpiryRemovedBy && camera.shutterExpiryRemovedAt) {
+                      by {{ camera.shutterExpiryRemovedBy }} on {{ camera.shutterExpiryRemovedAt | date: 'short' }}
+                    } @else if (camera.shutterExpiryRemovedBy) {
+                      by {{ camera.shutterExpiryRemovedBy }}
+                    } @else if (camera.shutterExpiryRemovedAt) {
+                      on {{ camera.shutterExpiryRemovedAt | date: 'short' }}
+                    }
+                  </dd>
+                </div>
+              }
+              @if (camera.deviceExpiryRemovedBy || camera.deviceExpiryRemovedAt) {
+                <div class="flex items-center justify-between">
+                  <dt class="font-semibold text-slate-700">Device expiry removed</dt>
+                  <dd class="text-xs text-slate-500">
+                    @if (camera.deviceExpiryRemovedBy && camera.deviceExpiryRemovedAt) {
+                      by {{ camera.deviceExpiryRemovedBy }} on {{ camera.deviceExpiryRemovedAt | date: 'short' }}
+                    } @else if (camera.deviceExpiryRemovedBy) {
+                      by {{ camera.deviceExpiryRemovedBy }}
+                    } @else if (camera.deviceExpiryRemovedAt) {
+                      on {{ camera.deviceExpiryRemovedAt | date: 'short' }}
                     }
                   </dd>
                 </div>

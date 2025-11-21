@@ -1,9 +1,23 @@
+export interface CameraInternalAttachment {
+  _id: string;
+  name: string;
+  originalName?: string;
+  size: number;
+  type: string;
+  url: string;
+  uploadedAt?: string;
+  uploadedBy?: string;
+  [key: string]: unknown;
+}
+
 export interface Camera {
   _id: string;
   camera: string;
   developer: string | CameraDeveloperReference;
   project: string | CameraProjectReference;
   cameraDescription?: string;
+  internalDescription?: string;
+  internalAttachments?: CameraInternalAttachment[];
   lat?: number | null;
   lng?: number | null;
   serverFolder?: string;
@@ -82,6 +96,7 @@ export interface CameraHealthResponse {
   developerId: string;
   projectId: string;
   cameraId: string;
+  hasDeviceExpired?: boolean;
   firstDay?: {
     date: string;
     count: number;
@@ -98,6 +113,8 @@ export interface CameraHealthResponse {
   hasMemoryAssigned?: boolean;
   memoryAvailable?: string | null;
   hasWrongTime?: boolean;
+  hasShutterExpiry?: boolean;
+  shutterCount?: number | null;
   error?: string;
   [key: string]: unknown;
 }
@@ -108,7 +125,7 @@ export interface CameraStatusHistory {
   cameraName?: string;
   developerId?: string;
   projectId?: string;
-  statusType: 'photoDirty' | 'betterView';
+  statusType: 'photoDirty' | 'betterView' | 'lowImages' | 'wrongTime' | 'shutterExpiry' | 'deviceExpiry';
   action: 'on' | 'off';
   isActive: boolean;
   performedBy: string;

@@ -139,16 +139,37 @@ export class InventoryOverviewComponent implements OnInit {
   readonly selectedStatus = signal<string | null>(null);
   readonly selectedAdminId = signal<string | null>(null);
   readonly selectedDeviceModel = signal<string | null>(null);
+  readonly selectedAgeStatus = signal<'healthy' | 'at_risk' | 'expired' | null>(null);
   readonly serialQuery = signal<string>('');
   readonly showAlarmedOnly = signal<boolean>(false);
   readonly editingDeviceTypeId = signal<string | null>(null);
   readonly deletingDeviceTypeId = signal<string | null>(null);
 
   readonly statusOptions = [
-    { value: 'available', label: 'Available' },
-    { value: 'assigned', label: 'Assigned' },
-    { value: 'user_assigned', label: 'User Assigned' },
+    { value: null, label: 'All status' },
+    { value: 'available', label: 'In Stock' },
+    { value: 'assigned', label: 'On Project' },
+    { value: 'user_assigned', label: 'With User' },
     { value: 'retired', label: 'Retired' },
+  ];
+
+  // Filtered status options based on permissions
+  readonly filteredStatusOptions = computed(() => {
+    // If user has only basic inventory access, show only "With User" option
+    if (this.hasOnlyBasicInventoryAccess()) {
+      return [
+        { value: 'user_assigned', label: 'With User' },
+      ];
+    }
+    // Otherwise, show all status options
+    return this.statusOptions;
+  });
+
+  readonly ageStatusOptions = [
+    { value: null, label: 'All ages' },
+    { value: 'healthy', label: 'Healthy' },
+    { value: 'at_risk', label: 'At Risk' },
+    { value: 'expired', label: 'Expired' },
   ];
 
   readonly currentUser = computed(() => this.authStore.user());
@@ -162,11 +183,19 @@ export class InventoryOverviewComponent implements OnInit {
   readonly canAddDeviceStock = computed(
     () => this.isSuperAdmin() || ((this.currentUser() as any)?.canAddDeviceStock ?? false),
   );
-  readonly canAssignUnassignUser = computed(
-    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canAssignUnassignUser ?? false),
+  readonly hasInventoryAccess = computed(
+    () => this.isSuperAdmin() || ((this.currentUser() as any)?.hasInventoryAccess ?? false),
   );
-  readonly canAssignUnassignProject = computed(
-    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canAssignUnassignProject ?? false),
+  readonly canSeeAllInventory = computed(
+    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canSeeAllInventory ?? false),
+  );
+  readonly canAssignToUserPermission = computed(
+    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canAssignToUser ?? false),
+  );
+  // Check if user has only basic inventory access (no see all permission)
+  // Users with just inventory access (without "see all inventory") should only see devices assigned to them
+  readonly hasOnlyBasicInventoryAccess = computed(
+    () => this.hasInventoryAccess() && !this.canSeeAllInventory(),
   );
 
   readonly developerMap = computed(() => new Map(this.developers().map((developer) => [developer._id, developer])));
@@ -300,6 +329,7 @@ export class InventoryOverviewComponent implements OnInit {
 
   readonly createDeviceModalOpen = signal(false);
   readonly createDeviceState = signal<{
+    itemId: string | null;
     type: string;
     serialNumber: string;
     model: string;
@@ -307,6 +337,7 @@ export class InventoryOverviewComponent implements OnInit {
     error: string | null;
     isSaving: boolean;
   }>({
+    itemId: null,
     type: '',
     serialNumber: '',
     model: '',
@@ -368,7 +399,7 @@ export class InventoryOverviewComponent implements OnInit {
         tone: userAssigned > 0 ? 'default' : 'warning',
       },
       {
-        title: 'Available stock',
+        title: 'In Stock',
         value: available.toString(),
         helper: available > 0 ? 'Ready for deployment' : 'Reorder required',
         tone: available > 0 ? 'positive' : 'warning',
@@ -408,6 +439,11 @@ export class InventoryOverviewComponent implements OnInit {
   readonly hasTypeModelOptions = computed(() => this.typeModelOptions().length > 0);
 
   ngOnInit(): void {
+    // Auto-select "With User" status for users with only basic inventory access
+    if (this.hasOnlyBasicInventoryAccess()) {
+      this.selectedStatus.set('user_assigned');
+    }
+    
     this.loadInventory();
     this.loadDeviceTypes();
     this.loadDevelopers();
@@ -439,7 +475,18 @@ export class InventoryOverviewComponent implements OnInit {
   }
 
   statusLabel(status: string | undefined): string {
-    return status ? status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Unknown';
+    if (!status) {
+      return 'Unknown';
+    }
+    const normalized = this.normalizeStatus(status);
+    const statusMap: Record<string, string> = {
+      'available': 'In Stock',
+      'assigned': 'On Project',
+      'user_assigned': 'With User',
+      'retired': 'Retired',
+      'inactive': 'Inactive',
+    };
+    return statusMap[normalized] || status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
   assignmentSummary(item: InventoryItem): string {
@@ -568,6 +615,15 @@ export class InventoryOverviewComponent implements OnInit {
       this.selectedCameraId.set(null);
       this.projects.set([]);
       this.cameras.set([]);
+    }
+  }
+
+  onAgeStatusChange(value: 'healthy' | 'at_risk' | 'expired' | null | string): void {
+    // Type guard to ensure value is one of the valid options
+    if (value === 'healthy' || value === 'at_risk' || value === 'expired' || value === null) {
+      this.selectedAgeStatus.set(value);
+    } else {
+      this.selectedAgeStatus.set(null);
     }
   }
 
@@ -1134,15 +1190,34 @@ export class InventoryOverviewComponent implements OnInit {
       });
   }
 
-  openCreateDeviceModal(): void {
-    this.createDeviceState.set({
-      type: this.deviceTypes()[0]?.name ?? '',
-      serialNumber: '',
-      model: '',
-      estimatedAge: '',
-      error: null,
-      isSaving: false,
-    });
+  openCreateDeviceModal(item?: InventoryItem): void {
+    if (item) {
+      // Edit mode
+      const estimatedAge = item['estimatedAge'];
+      const estimatedAgeString = estimatedAge !== null && estimatedAge !== undefined 
+        ? String(estimatedAge) 
+        : '';
+      this.createDeviceState.set({
+        itemId: item._id,
+        type: item.device?.type || '',
+        serialNumber: item.device?.serialNumber || '',
+        model: item.device?.model || '',
+        estimatedAge: estimatedAgeString,
+        error: null,
+        isSaving: false,
+      });
+    } else {
+      // Create mode
+      this.createDeviceState.set({
+        itemId: null,
+        type: this.deviceTypes()[0]?.name ?? '',
+        serialNumber: '',
+        model: '',
+        estimatedAge: '',
+        error: null,
+        isSaving: false,
+      });
+    }
     this.createDeviceModalOpen.set(true);
   }
 
@@ -1225,29 +1300,45 @@ export class InventoryOverviewComponent implements OnInit {
 
     const estimatedAgeValue = this.toFiniteDayCount(state.estimatedAge);
     
+    const isEditMode = !!state.itemId;
+    
     const payload: Partial<InventoryItem> = {
       device: {
         type: state.type.trim(),
         serialNumber: state.serialNumber.trim(),
         model: state.model.trim() ? state.model.trim() : undefined,
       },
-      status: 'available',
-      assignmentHistory: [],
-      validityDays:
-        this.deviceTypes().find((type) => type.name?.toLowerCase() === state.type.trim().toLowerCase())
-          ?.validityDays ?? 365,
-      ...(estimatedAgeValue !== null && { estimatedAge: estimatedAgeValue }),
     };
+    
+    // Include estimatedAge if it's a valid positive number
+    if (estimatedAgeValue !== null && estimatedAgeValue > 0) {
+      payload['estimatedAge'] = estimatedAgeValue;
+    } else if (estimatedAgeValue === 0 || (estimatedAgeValue === null && state.estimatedAge.trim() === '')) {
+      // Explicitly set to null if 0 or empty string
+      payload['estimatedAge'] = null;
+    }
 
-    this.inventoryService
-      .create(payload)
+    // For create mode, add default fields
+    if (!isEditMode) {
+      payload.status = 'available';
+      payload.assignmentHistory = [];
+      payload.validityDays =
+        this.deviceTypes().find((type) => type.name?.toLowerCase() === state.type.trim().toLowerCase())
+          ?.validityDays ?? 365;
+    }
+
+    const request = isEditMode
+      ? this.inventoryService.update(state.itemId!, payload)
+      : this.inventoryService.create(payload);
+
+    request
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         catchError((error) => {
-          console.error('Failed to create inventory item', error);
+          console.error(`Failed to ${isEditMode ? 'update' : 'create'} inventory item`, error);
           this.createDeviceState.update((current) => ({
             ...current,
-            error: 'Unable to create device. Please try again.',
+            error: `Unable to ${isEditMode ? 'update' : 'create'} device. Please try again.`,
             isSaving: false,
           }));
           return of(null);
@@ -1270,6 +1361,7 @@ export class InventoryOverviewComponent implements OnInit {
     this.selectedCameraId.set(null);
     this.selectedStatus.set(null);
     this.selectedAdminId.set(null);
+    this.selectedAgeStatus.set(null);
     this.serialQuery.set('');
     this.projects.set([]);
     this.cameras.set([]);
@@ -1327,7 +1419,7 @@ export class InventoryOverviewComponent implements OnInit {
       .getAdmins()
       .pipe(takeUntilDestroyed(this.destroyRef), catchError(() => of<User[]>([])))
       .subscribe((admins) => {
-        this.admins.set(admins);
+        this.admins.set(admins.sort((a, b) => a.name.localeCompare(b.name)));
       });
   }
 
@@ -1429,6 +1521,37 @@ export class InventoryOverviewComponent implements OnInit {
     return serial.toLowerCase().includes(query.toLowerCase());
   }
 
+  getDeviceAgeStatus(item: InventoryItem): 'healthy' | 'at_risk' | 'expired' | null {
+    const totalValidity = this.resolveValidityDays(item);
+    if (totalValidity === null) {
+      return null;
+    }
+
+    const remaining = this.getRemainingValidityDays(item);
+    if (remaining === null) {
+      return null;
+    }
+
+    const halfValidity = totalValidity / 2;
+
+    if (remaining <= 0) {
+      return 'expired';
+    } else if (remaining <= halfValidity) {
+      return 'at_risk';
+    } else {
+      return 'healthy';
+    }
+  }
+
+  private appliesAgeStatusFilter(item: InventoryItem, ageStatus: 'healthy' | 'at_risk' | 'expired' | null): boolean {
+    if (!ageStatus) {
+      return true;
+    }
+
+    const itemAgeStatus = this.getDeviceAgeStatus(item);
+    return itemAgeStatus === ageStatus;
+  }
+
   private applyFilters(items: InventoryItem[]): InventoryItem[] {
     const deviceType = this.selectedDeviceType();
     const deviceModel = this.selectedDeviceModel();
@@ -1437,9 +1560,10 @@ export class InventoryOverviewComponent implements OnInit {
     const cameraId = this.selectedCameraId();
     const status = this.selectedStatus();
     const adminId = this.selectedAdminId();
+    const ageStatus = this.selectedAgeStatus();
     const serialQuery = this.serialQuery();
 
-    return items.filter(
+    let filtered = items.filter(
       (item) =>
         this.appliesDeviceTypeFilter(item, deviceType) &&
         this.appliesDeviceModelFilter(item, deviceModel) &&
@@ -1448,8 +1572,40 @@ export class InventoryOverviewComponent implements OnInit {
         this.appliesCameraFilter(item, cameraId) &&
         this.appliesStatusFilter(item, status) &&
         this.appliesAdminFilter(item, adminId) &&
+        this.appliesAgeStatusFilter(item, ageStatus) &&
         this.appliesSerialFilter(item, serialQuery),
     );
+
+    // If user is not Super Admin and doesn't have "see all inventory" permission,
+    // show only items assigned to them
+    if (!this.isSuperAdmin() && !this.canSeeAllInventory()) {
+      const currentUser = this.currentUser();
+      if (!currentUser) {
+        // If no user object, show nothing
+        filtered = [];
+        return filtered;
+      }
+      
+      // Try both 'id' (from AuthenticatedUser) and '_id' (from backend response)
+      const currentUserId = (currentUser as any)?.['_id'] || (currentUser as any)?.id;
+      if (currentUserId) {
+        filtered = filtered.filter(
+          (item) => {
+            const assignmentUserId = item.currentUserAssignment?.userId;
+            if (!assignmentUserId) {
+              return false; // No assignment means not assigned to this user
+            }
+            // Compare both as strings to ensure type matching, and trim whitespace
+            return String(assignmentUserId).trim() === String(currentUserId).trim();
+          },
+        );
+      } else {
+        // If no user ID, show nothing
+        filtered = [];
+      }
+    }
+
+    return filtered;
   }
 
   canAssignToProject(item: InventoryItem): boolean {
@@ -1466,6 +1622,10 @@ export class InventoryOverviewComponent implements OnInit {
 
   canUnassignFromUser(item: InventoryItem): boolean {
     return !!item.currentUserAssignment;
+  }
+
+  isUnassigned(item: InventoryItem): boolean {
+    return !item.currentAssignment && !item.currentUserAssignment;
   }
 
   extractAssignmentId(reference: unknown): string | undefined {

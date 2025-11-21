@@ -3,20 +3,24 @@ import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angula
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { of } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
 import { CameraService } from '@core/services/camera.service';
 import { DeveloperService } from '@core/services/developer.service';
 import { ProjectService } from '@core/services/project.service';
-import { Camera } from '@core/models/camera.model';
+import { Camera, CameraInternalAttachment } from '@core/models/camera.model';
 import { Developer } from '@core/models/developer.model';
 import { Project } from '@core/models/project.model';
+import { environment } from '@env';
 
 interface CameraFormState {
   developer: string;
   project: string;
   camera: string;
   cameraDescription: string;
+  internalDescription: string;
+  internalAttachments: File[];
+  existingInternalAttachments: CameraInternalAttachment[];
   cindex: number;
   serverFolder: string;
   lat: string;
@@ -184,12 +188,95 @@ export class CameraFormComponent implements OnInit {
     }));
   }
 
+  onInternalAttachmentsChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) {
+      return;
+    }
+    const files = Array.from(input.files);
+    this.cameraForm.update((state) => ({
+      ...state,
+      internalAttachments: [...state.internalAttachments, ...files],
+      error: null,
+    }));
+    input.value = '';
+  }
+
+  removeInternalAttachment(index: number): void {
+    this.cameraForm.update((state) => {
+      const updated = [...state.internalAttachments];
+      updated.splice(index, 1);
+      return {
+        ...state,
+        internalAttachments: updated,
+        error: null,
+      };
+    });
+  }
+
+  deleteInternalAttachment(attachmentId: string): void {
+    const cameraId = this.cameraId();
+    if (!cameraId) {
+      return;
+    }
+
+    this.cameraForm.update((state) => ({ ...state, isSaving: true, error: null }));
+
+    this.cameraService
+      .deleteInternalAttachment(cameraId, attachmentId)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        catchError((error) => {
+          console.error('Failed to delete attachment', error);
+          this.cameraForm.update((state) => ({
+            ...state,
+            isSaving: false,
+            error: 'Unable to delete attachment. Please try again.',
+          }));
+          return of<Camera | null>(null);
+        }),
+      )
+      .subscribe((updatedCamera) => {
+        if (updatedCamera) {
+          this.cameraForm.update((state) => ({
+            ...state,
+            existingInternalAttachments: updatedCamera.internalAttachments ?? [],
+            isSaving: false,
+            error: null,
+          }));
+        }
+      });
+  }
+
+  getAttachmentUrl(attachment: CameraInternalAttachment): string {
+    if (!attachment?.url) {
+      return '#';
+    }
+    if (attachment.url.startsWith('http://') || attachment.url.startsWith('https://')) {
+      return attachment.url;
+    }
+    const sanitized = attachment.url.startsWith('/') ? attachment.url : `/${attachment.url}`;
+    const mediaBaseUrl = environment.apiUrl.replace('/api', '');
+    return `${mediaBaseUrl}${sanitized}`;
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  }
+
   private createEmptyForm(): CameraFormState {
     return {
       developer: '',
       project: '',
       camera: '',
       cameraDescription: '',
+      internalDescription: '',
+      internalAttachments: [],
+      existingInternalAttachments: [],
       cindex: 0,
       serverFolder: '',
       lat: '',
@@ -212,6 +299,9 @@ export class CameraFormComponent implements OnInit {
       project: projectId,
       camera: camera.camera || '',
       cameraDescription: camera.cameraDescription || '',
+      internalDescription: camera.internalDescription || '',
+      internalAttachments: [],
+      existingInternalAttachments: camera.internalAttachments ?? [],
       cindex: camera.cindex || 0,
       serverFolder: camera.serverFolder || '',
       lat: camera.lat?.toString() || '',
@@ -238,23 +328,57 @@ export class CameraFormComponent implements OnInit {
 
     this.cameraForm.update((f) => ({ ...f, isSaving: true, error: null }));
 
-    const payload: Partial<Camera> = {
-      developer: form.developer,
-      project: form.project,
-      camera: form.camera.trim(),
-      cameraDescription: form.cameraDescription.trim(),
-      cindex: form.cindex,
-      serverFolder: form.serverFolder.trim(),
-      lat: form.lat ? parseFloat(form.lat) : null,
-      lng: form.lng ? parseFloat(form.lng) : null,
-      isActive: form.isActive,
-      country: form.country,
-      server: form.server,
-    };
+    // Use FormData if there are attachments or internal description, otherwise use JSON
+    const hasAttachments = form.internalAttachments.length > 0;
+    const hasInternalDescription = form.internalDescription.trim().length > 0;
 
-    const request = this.isEditMode() && this.cameraId()
-      ? this.cameraService.update(this.cameraId()!, payload)
-      : this.cameraService.create(payload);
+    let request: Observable<Camera>;
+
+    if (hasAttachments || hasInternalDescription) {
+      // Use FormData for file uploads
+      const formData = new FormData();
+      formData.append('developer', form.developer);
+      formData.append('project', form.project);
+      formData.append('camera', form.camera.trim());
+      formData.append('cameraDescription', form.cameraDescription.trim());
+      formData.append('internalDescription', form.internalDescription.trim());
+      formData.append('cindex', form.cindex.toString());
+      formData.append('serverFolder', form.serverFolder.trim());
+      formData.append('lat', form.lat || '');
+      formData.append('lng', form.lng || '');
+      formData.append('isActive', form.isActive.toString());
+      formData.append('country', form.country);
+      formData.append('server', form.server);
+
+      // Append internal attachments
+      form.internalAttachments.forEach((file) => {
+        formData.append('internalAttachments', file, file.name);
+      });
+
+      request = this.isEditMode() && this.cameraId()
+        ? this.cameraService.update(this.cameraId()!, formData)
+        : this.cameraService.create(formData);
+    } else {
+      // Use JSON payload
+      const payload: Partial<Camera> = {
+        developer: form.developer,
+        project: form.project,
+        camera: form.camera.trim(),
+        cameraDescription: form.cameraDescription.trim(),
+        internalDescription: form.internalDescription.trim(),
+        cindex: form.cindex,
+        serverFolder: form.serverFolder.trim(),
+        lat: form.lat ? parseFloat(form.lat) : null,
+        lng: form.lng ? parseFloat(form.lng) : null,
+        isActive: form.isActive,
+        country: form.country,
+        server: form.server,
+      };
+
+      request = this.isEditMode() && this.cameraId()
+        ? this.cameraService.update(this.cameraId()!, payload)
+        : this.cameraService.create(payload);
+    }
 
     request
       .pipe(

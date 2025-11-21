@@ -6,6 +6,7 @@ export interface User {
   email: string;
   phone?: string;
   role: UserRole | string;
+  country?: 'UAE' | 'Saudi Arabia';
   image?: string; // User profile image/avatar URL (legacy/alias)
   logo?: string; // User profile image/avatar path (backend field: logos/user/filename)
   accessibleDevelopers: string[];

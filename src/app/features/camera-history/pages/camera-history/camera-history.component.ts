@@ -19,6 +19,7 @@ import {
   CameraHistoryPreviewResponse,
   CameraHistoryResponse,
   CameraHistoryVideoResponse,
+  CameraStatusHistory,
 } from '@core/models/camera.model';
 import { Developer } from '@core/models/developer.model';
 import { Project } from '@core/models/project.model';
@@ -78,6 +79,7 @@ export class CameraHistoryComponent implements OnInit {
   readonly users = signal<User[]>([]);
   readonly health = signal<CameraHealthResponse | null>(null);
   readonly cameraMemories = signal<Memory[]>([]);
+  readonly statusHistory = signal<CameraStatusHistory[]>([]);
 
   readonly selectedDate = signal<string>('');
   readonly appliedDate = signal<string>('');
@@ -111,6 +113,19 @@ export class CameraHistoryComponent implements OnInit {
   });
 
   readonly hasMaintenanceHistory = computed(() => this.sortedMaintenanceTasks().length > 0);
+
+  readonly sortedStatusHistory = computed(() => {
+    const history = [...this.statusHistory()];
+    // Sort by performedAt date (most recent first)
+    history.sort((a, b) => {
+      const aTime = new Date(a.performedAt).getTime();
+      const bTime = new Date(b.performedAt).getTime();
+      return bTime - aTime;
+    });
+    return history;
+  });
+
+  readonly hasStatusHistory = computed(() => this.sortedStatusHistory().length > 0);
 
   readonly userMap = computed(() => {
     const map = new Map<string, User>();
@@ -368,8 +383,11 @@ export class CameraHistoryComponent implements OnInit {
                 .getByCamera(camera._id)
                 .pipe(catchError(() => of<Maintenance[]>([]))),
               health: healthRequest,
+              statusHistory: this.cameraService
+                .getStatusHistory(camera._id)
+                .pipe(catchError(() => of<CameraStatusHistory[]>([]))),
             }).pipe(
-              tap(({ history, preview, maintenance, health }) => {
+              tap(({ history, preview, maintenance, health, statusHistory }) => {
                 if (history.error) {
                   throw new Error(history.error);
                 }
@@ -378,6 +396,7 @@ export class CameraHistoryComponent implements OnInit {
                 this.preview.set(preview);
                 this.maintenanceTasks.set(maintenance ?? []);
                 this.health.set(health);
+                this.statusHistory.set(statusHistory ?? []);
 
                 // Set default to yesterday's date
                 this.selectedDate.set(yesterdayStr);
@@ -691,6 +710,35 @@ export class CameraHistoryComponent implements OnInit {
 
   closeImageModal(): void {
     this.selectedImageUrl.set(null);
+  }
+
+  getStatusTypeLabel(statusType: string): string {
+    switch (statusType) {
+      case 'photoDirty':
+        return 'Photo dirty';
+      case 'betterView':
+        return 'Better view';
+      case 'lowImages':
+        return 'Less image';
+      case 'wrongTime':
+        return 'Wrong time';
+      case 'shutterExpiry':
+        return 'Shutter expiry';
+      case 'deviceExpiry':
+        return 'Device expiry';
+      default:
+        return statusType;
+    }
+  }
+
+  getStatusActionLabel(action: string): string {
+    return action === 'on' ? 'Marked' : 'Removed';
+  }
+
+  getStatusActionColor(action: string): string {
+    return action === 'on'
+      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+      : 'border-rose-300 bg-rose-50 text-rose-700';
   }
 
   private showToast(message: string, tone: 'success' | 'error'): void {

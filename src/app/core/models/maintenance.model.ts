@@ -61,5 +61,6 @@ export const LEGACY_TASK_TYPES: readonly string[] = [
   'Installation',
   'Reinstallation',
   'Better View Survey',
+  'other',
 ];
 
