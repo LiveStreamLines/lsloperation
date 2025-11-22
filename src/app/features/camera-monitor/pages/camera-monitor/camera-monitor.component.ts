@@ -325,6 +325,9 @@ export class CameraMonitorComponent implements OnInit {
   readonly canDeletePhoto = computed(
     () => this.isSuperAdmin() || ((this.currentUser() as any)?.canDeletePhoto ?? false),
   );
+  readonly canTogglePhotoDirtyBetterView = computed(
+    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canTogglePhotoDirtyBetterView ?? false),
+  );
   readonly accessibleDevelopers = computed(() => this.currentUser()?.accessibleDevelopers ?? []);
 
   readonly filteredCameras = computed<CameraViewModel[]>(() => {

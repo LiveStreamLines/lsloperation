@@ -831,7 +831,7 @@
                               </button>
                             }
                             <!-- Photo dirty button - only for online (100% health) and maintenance -->
-                            @if (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time') {
+                            @if (canTogglePhotoDirtyBetterView() && (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time')) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -847,7 +847,7 @@
                               </button>
                             }
                             <!-- Better view button - only for online (100% health) and maintenance -->
-                            @if (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time') {
+                            @if (canTogglePhotoDirtyBetterView() && (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time')) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -1360,7 +1360,7 @@
                               </button>
                             }
                             <!-- Photo dirty button - only for online (100% health) and maintenance -->
-                            @if (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time') {
+                            @if (canTogglePhotoDirtyBetterView() && (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time')) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -1376,7 +1376,7 @@
                               </button>
                             }
                             <!-- Better view button - only for online (100% health) and maintenance -->
-                            @if (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time') {
+                            @if (canTogglePhotoDirtyBetterView() && (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time')) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"

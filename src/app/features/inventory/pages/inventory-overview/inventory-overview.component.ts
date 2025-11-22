@@ -70,6 +70,7 @@ export class InventoryOverviewComponent implements OnInit {
   });
   readonly filteredItemsLazy = computed(() => this.filteredItems());
   readonly isLoading = signal(true);
+  readonly isRefreshing = signal(false);
   readonly errorMessage = signal<string | null>(null);
 
   readonly deviceTypes = signal<DeviceType[]>([]);
@@ -450,6 +451,27 @@ export class InventoryOverviewComponent implements OnInit {
     this.loadAllProjects();
     this.loadAllCameras();
     this.loadAdmins();
+  }
+
+  refresh(): void {
+    if (this.isRefreshing() || this.isLoading()) {
+      return;
+    }
+
+    this.isRefreshing.set(true);
+    this.errorMessage.set(null);
+
+    this.loadInventory();
+    this.loadDeviceTypes();
+    this.loadDevelopers();
+    this.loadAllProjects();
+    this.loadAllCameras();
+    this.loadAdmins();
+
+    // Reset refreshing state after a short delay to allow loading to complete
+    setTimeout(() => {
+      this.isRefreshing.set(false);
+    }, 500);
   }
 
   statusColor(status: string | undefined): string {
@@ -1433,7 +1455,10 @@ export class InventoryOverviewComponent implements OnInit {
           this.errorMessage.set('Unable to load inventory. Please try again.');
           return of<InventoryItem[]>([]);
         }),
-        finalize(() => this.isLoading.set(false)),
+        finalize(() => {
+          this.isLoading.set(false);
+          this.isRefreshing.set(false);
+        }),
       )
       .subscribe((items) => {
         this.items.set(items);
@@ -1532,11 +1557,12 @@ export class InventoryOverviewComponent implements OnInit {
       return null;
     }
 
-    const halfValidity = totalValidity / 2;
+    // At risk when 90% of validity is used, meaning remaining <= 10% of total
+    const atRiskThreshold = totalValidity * 0.1;
 
     if (remaining <= 0) {
       return 'expired';
-    } else if (remaining <= halfValidity) {
+    } else if (remaining <= atRiskThreshold) {
       return 'at_risk';
     } else {
       return 'healthy';

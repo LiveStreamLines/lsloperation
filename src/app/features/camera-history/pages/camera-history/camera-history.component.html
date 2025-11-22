@@ -141,6 +141,19 @@
                       Since {{ item.currentAssignment?.assignedDate | date: 'mediumDate' }}
                     </p>
                   }
+                  @let remaining = getRemainingValidityDays(item);
+                  @if (remaining !== null) {
+                    <p class="text-xs font-semibold"
+                      [ngClass]="
+                        remaining <= 0
+                          ? 'text-rose-600'
+                          : remaining <= 30
+                          ? 'text-amber-600'
+                          : 'text-slate-600'
+                      ">
+                      Validity left: {{ remaining }} days
+                    </p>
+                  }
                   @if (item.currentAssignment?.notes) {
                     <p class="text-xs text-slate-500">Notes: {{ item.currentAssignment?.notes }}</p>
                   }

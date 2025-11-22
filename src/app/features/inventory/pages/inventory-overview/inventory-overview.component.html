@@ -6,6 +6,19 @@
         <h1 class="mt-1 text-3xl font-bold text-slate-900">Inventory Orchestration</h1>
       </div>
       <div class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+          (click)="refresh()"
+          [disabled]="isRefreshing() || isLoading()"
+        >
+          <svg viewBox="0 0 20 20" class="h-4 w-4 fill-current">
+            <path
+              d="M3.172 7A7.001 7.001 0 0117 10a1 1 0 11-2 0 5 5 0 00-8.9-3H8a1 1 0 010 2H3a1 1 0 01-1-1V3a1 1 0 012 0v2a6.964 6.964 0 011.172 2zM17 13l.001 4a1 1 0 01-1 1H12a1 1 0 010-2h2.899A5.002 5.002 0 007 11a1 1 0 010-2 7 7 0 018.828 5H12a1 1 0 110-2h5a1 1 0 011 1z"
+            />
+          </svg>
+          {{ isRefreshing() ? 'Refreshing…' : 'Refresh data' }}
+        </button>
         @if (canAddDeviceStock()) {
           <button
             type="button"
@@ -366,7 +379,7 @@
                               : 'text-slate-900'
                           "
                         >
-                          {{ remaining > 0 ? remaining : 0 }}
+                          {{ remaining }}
                         </span>
                         <span class="text-xs uppercase tracking-wide text-slate-400">days</span>
                       </div>
@@ -1068,7 +1081,7 @@
       <button
         type="button"
         class="absolute right-4 top-4 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900"
-        (click)="viewItemModal.set(null); cancelEditEstimatedAge()"
+        (click)="viewItemModal.set(null)"
       >
         <span class="sr-only">Close modal</span>
         <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -1076,7 +1089,7 @@
         </svg>
       </button>
 
-      <div class="space-y-6">
+      <div class="max-h-[90vh] space-y-6 overflow-y-auto pr-2">
         <header>
           <h2 class="text-xl font-semibold text-slate-900">Inventory details</h2>
           <p class="mt-1 text-sm text-slate-500">
@@ -1115,61 +1128,8 @@
           <div>
             <p class="text-xs uppercase tracking-wide text-slate-500">Estimated age (days)</p>
             @if (viewItemModal()) {
-              @if (isEditingEstimatedAge(viewItemModal()!._id)) {
-                <div class="space-y-2">
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    class="w-full rounded-2xl border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Enter estimated age"
-                    [value]="editEstimatedAgeState().estimatedAge"
-                    (input)="onEstimatedAgeChange($any($event.target).value)"
-                    [disabled]="editEstimatedAgeState().isSaving"
-                  />
-                  @if (editEstimatedAgeState().error) {
-                    <p class="text-xs text-rose-600">{{ editEstimatedAgeState().error }}</p>
-                  }
-                  <div class="flex items-center gap-2">
-                    <button
-                      type="button"
-                      class="inline-flex items-center rounded-xl bg-indigo-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-                      (click)="saveEstimatedAge()"
-                      [disabled]="editEstimatedAgeState().isSaving"
-                    >
-                      @if (editEstimatedAgeState().isSaving) {
-                        <span class="mr-1 h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></span>
-                      }
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      (click)="cancelEditEstimatedAge()"
-                      [disabled]="editEstimatedAgeState().isSaving"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              } @else {
-                <div class="flex items-center justify-between gap-2">
-                  <p class="text-sm font-semibold text-slate-900">
-                    @let estimatedAge = getCurrentEstimatedAge(viewItemModal()!);
-                    {{ estimatedAge !== null ? estimatedAge : '—' }}
-                  </p>
-                  <button
-                    type="button"
-                    class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600"
-                    (click)="startEditEstimatedAge(viewItemModal()!)"
-                    title="Edit estimated age"
-                  >
-                    <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current">
-                      <path d="M13.586 3a2 2 0 012.828 2.828l-9.192 9.19a1 1 0 01-.45.263l-3 1a1 1 0 01-1.263-1.263l1-3a1 1 0 01.263-.45l9.191-9.192zM12.172 5L5 12.172V15h2.828L15 7.828 12.172 5z" />
-                    </svg>
-                  </button>
-                </div>
-              }
+              @let estimatedAge = getCurrentEstimatedAge(viewItemModal()!);
+              <p class="text-sm font-semibold text-slate-900">{{ estimatedAge !== null ? estimatedAge : '—' }}</p>
             }
           </div>
         </section>

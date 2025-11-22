@@ -36,6 +36,8 @@ import { UserService } from '@core/services/user.service';
 import { Memory } from '@core/models/memory.model';
 import { MemoryService } from '@core/services/memory.service';
 import { AuthStore } from '@core/auth/auth.store';
+import { DeviceType } from '@core/models/device-type.model';
+import { DeviceTypeService } from '@core/services/device-type.service';
 
 interface CameraHistoryTags {
   developerTag: string;
@@ -63,6 +65,7 @@ export class CameraHistoryComponent implements OnInit {
   private readonly userService = inject(UserService);
   private readonly memoryService = inject(MemoryService);
   private readonly authStore = inject(AuthStore);
+  private readonly deviceTypeService = inject(DeviceTypeService);
   private readonly mediaBase = environment.apiUrl.replace(/\/api\/?$/, '/');
 
   readonly isLoading = signal(true);
@@ -80,6 +83,7 @@ export class CameraHistoryComponent implements OnInit {
   readonly health = signal<CameraHealthResponse | null>(null);
   readonly cameraMemories = signal<Memory[]>([]);
   readonly statusHistory = signal<CameraStatusHistory[]>([]);
+  readonly deviceTypes = signal<DeviceType[]>([]);
 
   readonly selectedDate = signal<string>('');
   readonly appliedDate = signal<string>('');
@@ -332,11 +336,13 @@ export class CameraHistoryComponent implements OnInit {
             .getByCamera(cameraIdRef, camera.camera)
             .pipe(catchError(() => of<InventoryItem[]>([]))),
           memories: this.memoryService.getAll().pipe(catchError(() => of<Memory[]>([]))),
+          deviceTypes: this.deviceTypeService.getAll().pipe(catchError(() => of<DeviceType[]>([]))),
         }).pipe(
-          switchMap(({ developer, project, inventory, memories }) => {
+          switchMap(({ developer, project, inventory, memories, deviceTypes }) => {
             this.developer.set(developer ?? null);
             this.project.set(project ?? null);
             this.cameraInventory.set(inventory ?? []);
+            this.deviceTypes.set(deviceTypes ?? []);
 
             const tags = this.resolveTags(camera, developer ?? null, project ?? null);
             if (!tags) {
@@ -641,6 +647,105 @@ export class CameraHistoryComponent implements OnInit {
     const device = inventory.device ?? ({} as Record<string, unknown>);
     const serial = device['serialNumber'] as string | undefined;
     return serial ?? inventory._id;
+  }
+
+  getRemainingValidityDays(item: InventoryItem): number | null {
+    const totalValidity = this.resolveValidityDays(item);
+    if (totalValidity === null) {
+      return null;
+    }
+
+    const age = this.calculateAgeInDays(item) ?? 0;
+    return totalValidity - age;
+  }
+
+  private resolveValidityDays(item: InventoryItem): number | null {
+    const typeName = item.device?.type?.trim().toLowerCase();
+    if (typeName) {
+      const deviceType = this.deviceTypes().find(
+        (type) => type.name?.trim().toLowerCase() === typeName,
+      );
+      const fromDeviceType = this.toFiniteDayCount(deviceType?.validityDays);
+      if (fromDeviceType !== null) {
+        return fromDeviceType;
+      }
+    }
+
+    const fromItem = this.toFiniteDayCount(item.validityDays);
+    if (fromItem !== null) {
+      return fromItem;
+    }
+
+    return null;
+  }
+
+  private calculateAgeInDays(item: InventoryItem): number | null {
+    let total = 0;
+    let hasRange = false;
+
+    // Add estimated age as initial value if present
+    const estimatedAge = this.toFiniteDayCount(item['estimatedAge']);
+    if (estimatedAge !== null && estimatedAge > 0) {
+      total += estimatedAge;
+      hasRange = true;
+    }
+
+    const addRange = (start?: string, end?: string) => {
+      const duration = this.calculateDurationInDays(start, end);
+      if (duration > 0) {
+        total += duration;
+        hasRange = true;
+      }
+    };
+
+    const currentAssignment = item.currentAssignment;
+    if (currentAssignment?.assignedDate) {
+      addRange(currentAssignment.assignedDate, currentAssignment.removedDate);
+    }
+
+    for (const assignment of item.assignmentHistory ?? []) {
+      addRange(assignment.assignedDate, assignment.removedDate);
+    }
+
+    return hasRange ? total : null;
+  }
+
+  private calculateDurationInDays(start?: string, end?: string): number {
+    const startDate = this.parseDate(start);
+    if (!startDate) {
+      return 0;
+    }
+
+    const endDate = this.parseDate(end) ?? new Date();
+    const milliseconds = endDate.getTime() - startDate.getTime();
+
+    if (milliseconds <= 0) {
+      return 0;
+    }
+
+    return Math.floor(milliseconds / (1000 * 60 * 60 * 24));
+  }
+
+  private parseDate(value?: string): Date | null {
+    if (!value) {
+      return null;
+    }
+
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  private toFiniteDayCount(value: unknown): number | null {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? Math.max(Math.round(value), 0) : null;
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? Math.max(Math.round(parsed), 0) : null;
+    }
+
+    return null;
   }
 
   formatAssignedUsers(task: Maintenance): string {

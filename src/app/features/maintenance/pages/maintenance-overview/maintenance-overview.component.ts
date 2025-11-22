@@ -158,7 +158,6 @@ interface CompletionChecklist {
   };
   removal: boolean;
   installation: boolean;
-  reinstallation: boolean;
   addItems: boolean;
   removeItems: boolean;
 }
@@ -254,7 +253,6 @@ export class MaintenanceOverviewComponent implements OnInit {
       },
       removal: false,
       installation: false,
-      reinstallation: false,
       addItems: false,
       removeItems: false,
     },
@@ -284,6 +282,9 @@ export class MaintenanceOverviewComponent implements OnInit {
 
   readonly installMaterialsModal = signal<UiMaintenance | null>(null);
   readonly installMaterialsState = signal<InstallMaterialsState>(this.createEmptyInstallState());
+
+  // Camera health data for installation conditional logic
+  readonly cameraHealthData = signal<{ cameraId: string; imageCount: number | null } | null>(null);
 
   private readonly emptyReplaceState: ReplaceMaterialsState = {
     isLoading: false,
@@ -359,7 +360,6 @@ export class MaintenanceOverviewComponent implements OnInit {
       },
       removal: false,
       installation: false,
-      reinstallation: false,
       addItems: false,
       removeItems: false,
     };
@@ -790,12 +790,14 @@ export class MaintenanceOverviewComponent implements OnInit {
 
     this.loadMaterialsForCompletion(task);
     this.resetCompletionInventoryState();
+    this.loadCameraHealthForInstallation(task);
   }
 
   closeCompleteTaskModal(): void {
     this.completeTaskModal.set(null);
     this.completeMaterialsState.set({ ...this.emptyReplaceState });
     this.resetCompletionInventoryState();
+    this.cameraHealthData.set(null);
   }
 
   openCancelTaskModal(task: UiMaintenance): void {
@@ -904,7 +906,7 @@ export class MaintenanceOverviewComponent implements OnInit {
     const breakdownReasonText = form.breakdownReason.trim();
     const inventoryState = this.completeInventoryState();
     const wantsAddItems =
-      form.actions.addItems || form.actions.installation || form.actions.reinstallation;
+      form.actions.addItems || form.actions.installation;
     const addItemIds = wantsAddItems ? Array.from(inventoryState.addSelections.values()) : [];
     const wantsRemoval = form.actions.removeItems || form.actions.removal;
     const removeItemIds = form.actions.removal
@@ -1253,7 +1255,6 @@ export class MaintenanceOverviewComponent implements OnInit {
       | 'maintenance'
       | 'removal'
       | 'installation'
-      | 'reinstallation'
       | 'addItems'
       | 'removeItems',
     value: boolean,
@@ -1264,14 +1265,14 @@ export class MaintenanceOverviewComponent implements OnInit {
         maintenance: { ...current.maintenance },
       };
 
-      const isHighPriority = action === 'removal' || action === 'installation' || action === 'reinstallation';
+      const isHighPriority = action === 'removal' || action === 'installation';
       const isStandard =
         action === 'breakdown' ||
         action === 'maintenance' ||
         action === 'addItems' ||
         action === 'removeItems';
 
-      const currentHighPriorityActive = current.removal || current.installation || current.reinstallation;
+      const currentHighPriorityActive = current.removal || current.installation;
       const currentStandardActive =
         current.breakdown || current.maintenance.enabled || current.addItems || current.removeItems;
 
@@ -1318,7 +1319,6 @@ export class MaintenanceOverviewComponent implements OnInit {
             next.addItems = false;
             next.removeItems = false;
             next.installation = false;
-            next.reinstallation = false;
           }
           break;
         case 'installation':
@@ -1338,27 +1338,6 @@ export class MaintenanceOverviewComponent implements OnInit {
             next.addItems = false;
             next.removeItems = false;
             next.removal = false;
-            next.reinstallation = false;
-          }
-          break;
-        case 'reinstallation':
-          next.reinstallation = value;
-          if (value) {
-            next.breakdown = false;
-            next.breakdownNone = false;
-            next.maintenance = {
-              enabled: false,
-              cleaning: false,
-              viewAdjustment: false,
-              materialReplacement: false,
-              lockChecked: false,
-              memoryChanging: false,
-              betterViewSurvey: false,
-            };
-            next.addItems = false;
-            next.removeItems = false;
-            next.removal = false;
-            next.installation = false;
           }
           break;
         case 'addItems':
@@ -1366,7 +1345,6 @@ export class MaintenanceOverviewComponent implements OnInit {
           if (value) {
             next.removal = false;
             next.installation = false;
-            next.reinstallation = false;
           }
           break;
         case 'removeItems':
@@ -1374,7 +1352,6 @@ export class MaintenanceOverviewComponent implements OnInit {
           if (value) {
             next.removal = false;
             next.installation = false;
-            next.reinstallation = false;
           }
           break;
       }
@@ -1565,7 +1542,7 @@ export class MaintenanceOverviewComponent implements OnInit {
 
   shouldDisableStandardActions(): boolean {
     const actions = this.completeTaskForm().actions;
-    return actions.removal || actions.installation || actions.reinstallation;
+    return actions.removal || actions.installation;
   }
 
   shouldDisableHighPriorityActions(): boolean {
@@ -1638,9 +1615,6 @@ export class MaintenanceOverviewComponent implements OnInit {
       items.push('Installation completed');
     }
 
-    if (actions.reinstallation) {
-      items.push('Reinstallation completed');
-    }
 
     if (actions.addItems) {
       items.push('Added materials from personal stock');
@@ -2756,4 +2730,67 @@ export class MaintenanceOverviewComponent implements OnInit {
       this.isEditAssistantsDropdownOpen.set(false);
     }
   }
+
+  private loadCameraHealthForInstallation(task: UiMaintenance): void {
+    if (!task.cameraId || !task.developerId || !task.projectId) {
+      this.cameraHealthData.set(null);
+      return;
+    }
+
+    this.cameraService
+      .getHealth(task.developerId, task.projectId, task.cameraId)
+      .pipe(
+        catchError(() => {
+          this.cameraHealthData.set({ cameraId: task.cameraId!, imageCount: null });
+          return of(null);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((health) => {
+        if (health && !health.error) {
+          // Check totalImages - total count of images for the camera
+          const imageCount = health.totalImages ?? 0;
+          this.cameraHealthData.set({ cameraId: task.cameraId!, imageCount });
+        } else {
+          // If health check fails, assume we don't know (set to null to prevent showing installation)
+          this.cameraHealthData.set({ cameraId: task.cameraId!, imageCount: null });
+        }
+      });
+  }
+
+  readonly shouldShowInstallation = computed(() => {
+    const task = this.completeTaskModal();
+    if (!task?.cameraId) {
+      return false;
+    }
+
+    // Check if camera has no images
+    const healthData = this.cameraHealthData();
+    // Only consider hasNoImages if healthData is loaded for this camera
+    let hasNoImages = false;
+    if (healthData?.cameraId === task.cameraId) {
+      // Health data is loaded for this camera
+      // imageCount is null if health check failed, or a number (0 or more) if successful
+      // Camera has no images only if imageCount is explicitly 0
+      hasNoImages = healthData.imageCount !== null && healthData.imageCount === 0;
+    } else {
+      // Health data not loaded yet or for different camera - don't show installation
+      return false;
+    }
+
+    // Check if last task was removal
+    const cameraTasks = this.tasks()
+      .filter((t) => t.cameraId === task.cameraId && t.status === 'completed')
+      .sort((a, b) => {
+        const dateA = a.completionTime ? new Date(a.completionTime).getTime() : 0;
+        const dateB = b.completionTime ? new Date(b.completionTime).getTime() : 0;
+        return dateB - dateA; // Most recent first
+      });
+
+    const lastTask = cameraTasks.length > 0 ? cameraTasks[0] : null;
+    const lastTaskWasRemoval = lastTask?.userComment?.toLowerCase().includes('removal completed') ?? false;
+
+    // Only show installation if camera has no images (totalImages === 0) OR last task was removal
+    return hasNoImages || lastTaskWasRemoval;
+  });
 }

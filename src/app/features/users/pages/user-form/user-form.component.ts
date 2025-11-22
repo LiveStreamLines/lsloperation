@@ -45,6 +45,7 @@ interface UserFormState {
   canCreateMonitorTask: boolean;
   canHoldMaintenance: boolean;
   canDeletePhoto: boolean;
+  canTogglePhotoDirtyBetterView: boolean;
   canSeeAllTasks: boolean;
   // Operation permissions - inventory
   canAddDeviceType: boolean;
@@ -483,6 +484,7 @@ export class UserFormComponent implements OnInit {
             canCreateMonitorTask: false,
             canHoldMaintenance: false,
             canDeletePhoto: false,
+            canTogglePhotoDirtyBetterView: false,
             canSeeAllTasks: false,
           }),
     }));
@@ -635,6 +637,7 @@ export class UserFormComponent implements OnInit {
       canCreateMonitorTask: false,
       canHoldMaintenance: false,
       canDeletePhoto: false,
+      canTogglePhotoDirtyBetterView: false,
       canSeeAllTasks: false,
       canAddDeviceType: false,
       canAddDeviceStock: false,
@@ -668,6 +671,7 @@ export class UserFormComponent implements OnInit {
             this.normalizeBoolean((user as any).canCreateMonitorTask, false) ||
             this.normalizeBoolean((user as any).canHoldMaintenance, false) ||
             this.normalizeBoolean((user as any).canDeletePhoto, false) ||
+            this.normalizeBoolean((user as any).canTogglePhotoDirtyBetterView, false) ||
             this.normalizeBoolean((user as any).canSeeAllTasks, false)
           ),
       hasInventoryAccess: (user as any).hasInventoryAccess !== undefined
@@ -693,6 +697,7 @@ export class UserFormComponent implements OnInit {
       canCreateMonitorTask: this.normalizeBoolean((user as any).canCreateMonitorTask, false),
       canHoldMaintenance: this.normalizeBoolean((user as any).canHoldMaintenance, false),
       canDeletePhoto: this.normalizeBoolean((user as any).canDeletePhoto, false),
+      canTogglePhotoDirtyBetterView: this.normalizeBoolean((user as any).canTogglePhotoDirtyBetterView, false),
       canSeeAllTasks: this.normalizeBoolean((user as any).canSeeAllTasks, false),
       canAddDeviceType: this.normalizeBoolean((user as any).canAddDeviceType, false),
       canAddDeviceStock: this.normalizeBoolean((user as any).canAddDeviceStock, false),
@@ -885,6 +890,7 @@ export class UserFormComponent implements OnInit {
     appendBoolean('canCreateMonitorTask', form.canCreateMonitorTask);
     appendBoolean('canHoldMaintenance', form.canHoldMaintenance);
     appendBoolean('canDeletePhoto', form.canDeletePhoto);
+    appendBoolean('canTogglePhotoDirtyBetterView', form.canTogglePhotoDirtyBetterView);
     appendBoolean('canSeeAllTasks', form.canSeeAllTasks);
     appendBoolean('canAddDeviceType', form.canAddDeviceType);
     appendBoolean('canAddDeviceStock', form.canAddDeviceStock);
