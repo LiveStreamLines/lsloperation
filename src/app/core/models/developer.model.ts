@@ -15,6 +15,15 @@ export interface DeveloperContactPerson {
   [key: string]: unknown;
 }
 
+export interface DeveloperContact {
+  name: string;
+  phone: string;
+  email: string;
+  designation: string;
+  notes: string;
+  [key: string]: unknown;
+}
+
 export interface DeveloperBankDetails {
   bankName?: string;
   accountNumber?: string;
@@ -53,6 +62,7 @@ export interface Developer {
   address?: DeveloperAddress;
   contactPerson?: DeveloperContactPerson;
   bankDetails?: DeveloperBankDetails;
+  contacts?: DeveloperContact[];
   [key: string]: unknown;
 }
 

@@ -111,6 +111,7 @@ export class MemoriesOverviewComponent implements OnInit {
 
   readonly userRole = computed(() => this.authStore.user()?.role ?? 'Viewer');
   readonly userName = computed(() => this.authStore.user()?.name ?? 'System');
+  readonly isSuperAdmin = computed(() => this.authStore.user()?.role === 'Super Admin');
 
   readonly showLowMemoryToggle = computed(() => this.selectedStatus() === 'active');
 
@@ -125,8 +126,29 @@ export class MemoriesOverviewComponent implements OnInit {
     return this.baseStatusOptions;
   });
 
+  // Filter developers by country
+  readonly filteredDevelopers = computed(() => {
+    let developers = this.developers();
+    const user = this.authStore.user();
+    
+    // Filter by country: Only users with "All" see all developers
+    if (user?.country && user.country !== 'All') {
+      developers = developers.filter((dev) => {
+        // Only show developers where address.country matches user's country
+        const devCountry = dev.address?.country || dev['country'];
+        return devCountry === user.country;
+      });
+    } else if (!user?.country) {
+      // If user has no country set, don't show any developers
+      developers = [];
+    }
+    // If country is "All", show all developers (no filtering)
+    
+    return developers;
+  });
+
   readonly developerOptions = computed<FilterOption[]>(() =>
-    this.developers()
+    this.filteredDevelopers()
       .map((developer) => ({
         value: developer.developerTag ?? developer._id,
         label: developer.developerName,
@@ -183,7 +205,7 @@ export class MemoriesOverviewComponent implements OnInit {
 
   readonly developerMap = computed(() => {
     const map = new Map<string, Developer>();
-    for (const developer of this.developers()) {
+    for (const developer of this.filteredDevelopers()) {
       const tag = this.normalizeTag(developer.developerTag) || developer._id;
       if (tag) {
         map.set(tag, developer);
@@ -554,6 +576,43 @@ export class MemoriesOverviewComponent implements OnInit {
     const lowOnly = this.showLowMemoryOnly();
 
     return memories.filter((memory) => {
+      // Country filtering: Only users with "All" see all memories
+      const user = this.authStore.user();
+      if (user?.country && user.country !== 'All') {
+        const userCountry = user.country;
+        // Check camera's country first
+        if (memory.cameraTag) {
+          const cameraObj = this.cameras().find(c => {
+            const camTag = this.normalizeTag(c.camera);
+            return camTag === memory.cameraTag;
+          });
+          if (cameraObj && cameraObj['country'] && cameraObj['country'] !== userCountry) {
+            return false;
+          }
+        }
+        // If no camera country, check developer's country
+        if (memory.developerTag) {
+          const developerObj = this.filteredDevelopers().find(d => {
+            const devTag = this.normalizeTag(d.developerTag);
+            return devTag === memory.developerTag;
+          });
+          if (developerObj) {
+            // Check address.country (preferred) or top-level country (fallback for legacy data)
+            const devCountry = developerObj.address?.country || developerObj['country'];
+            if (devCountry && devCountry !== userCountry) {
+              return false;
+            }
+          } else {
+            // If developer is not in filteredDevelopers, it means it doesn't match the country
+            return false;
+          }
+        }
+      } else if (!user?.country) {
+        // If user has no country set, don't show any memories
+        return false;
+      }
+      // If country is "All", show all memories (no filtering)
+
       if (developer && memory.developerTag !== developer) {
         return false;
       }

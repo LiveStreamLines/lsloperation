@@ -34,48 +34,107 @@ export class CamerasOverviewComponent implements OnInit {
   readonly projects = signal<Project[]>([]);
   readonly selectedDeveloperId = signal<string | null>(null);
   readonly selectedProjectId = signal<string | null>(null);
-  readonly selectedCountry = signal<string | null>(null);
   readonly searchTerm = signal('');
 
+  readonly isSuperAdmin = computed(() => this.authStore.user()?.role === 'Super Admin');
+
+  // Filter developers by country (same logic as developers overview)
+  readonly filteredDevelopers = computed(() => {
+    let developers = this.developers();
+    const user = this.authStore.user();
+    
+    // Filter by country: Only users with "All" see all developers
+    if (user?.country && user.country !== 'All') {
+      developers = developers.filter((dev) => {
+        // Only show developers where address.country matches user's country
+        const devCountry = dev.address?.country || dev['country'];
+        return devCountry === user.country;
+      });
+    } else if (!user?.country) {
+      // If user has no country set, don't show any developers
+      developers = [];
+    }
+    // If country is "All", show all developers (no filtering)
+    
+    return developers;
+  });
+
   readonly sortedDevelopers = computed(() => {
-    return [...this.developers()].sort((a, b) => {
+    return [...this.filteredDevelopers()].sort((a, b) => {
       const nameA = (a.developerName || '').toLowerCase();
       const nameB = (b.developerName || '').toLowerCase();
       return nameA.localeCompare(nameB);
     });
   });
 
+  // Filter projects by developer country
+  readonly filteredProjects = computed(() => {
+    let projects = this.projects();
+    const user = this.authStore.user();
+    
+    // Filter by country: Only users with "All" see all projects
+    if (user?.country && user.country !== 'All') {
+      // Get list of developer IDs that match user's country
+      const allowedDeveloperIds = new Set(
+        this.filteredDevelopers().map(dev => dev._id)
+      );
+      
+      // Only show projects that belong to developers from user's country
+      projects = projects.filter((proj) => {
+        const projectDeveloperId = typeof proj.developer === 'object' 
+          ? (proj.developer as any)?._id 
+          : proj.developer;
+        return projectDeveloperId && allowedDeveloperIds.has(projectDeveloperId);
+      });
+    } else if (!user?.country) {
+      // If user has no country set, don't show any projects
+      projects = [];
+    }
+    // If country is "All", show all projects (no filtering)
+    
+    return projects;
+  });
+
   readonly sortedProjects = computed(() => {
-    return [...this.projects()].sort((a, b) => {
+    return [...this.filteredProjects()].sort((a, b) => {
       const nameA = (a.projectName || '').toLowerCase();
       const nameB = (b.projectName || '').toLowerCase();
       return nameA.localeCompare(nameB);
     });
   });
 
-  readonly countryOptions = computed(() => {
-    const countries = new Set<string>();
-    for (const camera of this.cameras()) {
-      const country = (camera.country || '').trim();
-      if (country) {
-        countries.add(country);
-      }
+  // Get cameras filtered by developer country (before other filters)
+  readonly camerasByDeveloperCountry = computed(() => {
+    let cameras = this.cameras();
+    const user = this.authStore.user();
+
+    // Filter by developer country: Only users with "All" see all cameras
+    if (user?.country && user.country !== 'All') {
+      // Get list of developer IDs that match user's country
+      const allowedDeveloperIds = new Set(
+        this.filteredDevelopers().map(dev => dev._id)
+      );
+      
+      // Only show cameras that belong to developers from user's country
+      cameras = cameras.filter((camera) => {
+        const cameraDeveloperId = typeof camera.developer === 'object' 
+          ? (camera.developer as any)?._id 
+          : camera.developer;
+        return cameraDeveloperId && allowedDeveloperIds.has(cameraDeveloperId);
+      });
+    } else if (!user?.country) {
+      // If user has no country set, don't show any cameras
+      cameras = [];
     }
-    return Array.from(countries).sort((a, b) => a.localeCompare(b));
+    // If country is "All", show all cameras (no filtering)
+    
+    return cameras;
   });
 
   readonly filteredCameras = computed(() => {
     const term = this.searchTerm().toLowerCase().trim();
-    const selectedCountry = this.selectedCountry();
-    let cameras = this.cameras();
-
-    // Filter by country first
-    if (selectedCountry) {
-      cameras = cameras.filter((camera) => {
-        const cameraCountry = (camera.country || '').trim();
-        return cameraCountry === selectedCountry;
-      });
-    }
+    // Start with cameras filtered by developer country
+    let cameras = this.camerasByDeveloperCountry();
 
     // Then filter by search term
     if (!term) {
@@ -280,10 +339,6 @@ export class CamerasOverviewComponent implements OnInit {
 
   onSearchChange(term: string): void {
     this.searchTerm.set(term);
-  }
-
-  onCountryChange(country: string): void {
-    this.selectedCountry.set(country || null);
   }
 
   getDeveloperName(developer: string | { _id?: string; developerName?: string }): string {

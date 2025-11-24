@@ -12,6 +12,7 @@ import { Camera, CameraInternalAttachment } from '@core/models/camera.model';
 import { Developer } from '@core/models/developer.model';
 import { Project } from '@core/models/project.model';
 import { environment } from '@env';
+import { AuthStore } from '@core/auth/auth.store';
 
 interface CameraFormState {
   developer: string;
@@ -44,6 +45,7 @@ export class CameraFormComponent implements OnInit {
   private readonly projectService = inject(ProjectService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly authStore = inject(AuthStore);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly isLoading = signal(true);
@@ -53,8 +55,31 @@ export class CameraFormComponent implements OnInit {
   readonly isEditMode = signal(false);
   readonly cameraId = signal<string | null>(null);
 
+  readonly isSuperAdmin = computed(() => this.authStore.user()?.role === 'Super Admin');
+
+  // Filter developers by country
+  readonly filteredDevelopers = computed(() => {
+    let developers = this.developers();
+    const user = this.authStore.user();
+    
+    // Filter by country: Only users with "All" see all developers
+    if (user?.country && user.country !== 'All') {
+      developers = developers.filter((dev) => {
+        // Only show developers where address.country matches user's country
+        const devCountry = dev.address?.country || dev['country'];
+        return devCountry === user.country;
+      });
+    } else if (!user?.country) {
+      // If user has no country set, don't show any developers
+      developers = [];
+    }
+    // If country is "All", show all developers (no filtering)
+    
+    return developers;
+  });
+
   readonly sortedDevelopers = computed(() => {
-    return [...this.developers()].sort((a, b) => {
+    return [...this.filteredDevelopers()].sort((a, b) => {
       const nameA = (a.developerName || '').toLowerCase();
       const nameB = (b.developerName || '').toLowerCase();
       return nameA.localeCompare(nameB);

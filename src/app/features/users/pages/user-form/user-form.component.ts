@@ -22,7 +22,7 @@ interface UserFormState {
   email: string;
   phone: string;
   role: string;
-  country: 'UAE' | 'Saudi Arabia' | '';
+  country: 'UAE' | 'Saudi Arabia' | 'All' | '';
   image: string | null; // Persisted image path
   imageFile: File | null;
   imagePreview: string | null;
@@ -117,6 +117,62 @@ export class UserFormComponent implements OnInit {
   readonly isSuperAdmin = computed(() => {
     const user = this.authStore.user();
     return user?.role === 'Super Admin';
+  });
+
+  readonly currentUserCountry = computed(() => {
+    const user = this.authStore.user();
+    return user?.country;
+  });
+
+  readonly availableCountryOptions = computed(() => {
+    const currentCountry = this.currentUserCountry();
+    const isSuperAdmin = this.isSuperAdmin();
+    
+    // If not Super Admin, show all options
+    if (!isSuperAdmin) {
+      return [
+        { value: '', label: 'Select Country' },
+        { value: 'UAE', label: 'UAE' },
+        { value: 'Saudi Arabia', label: 'Saudi Arabia' }
+      ];
+    }
+    
+    // If Super Admin with "All" country, show all options including "All"
+    if (currentCountry === 'All') {
+      return [
+        { value: '', label: 'Select Country' },
+        { value: 'All', label: 'All' },
+        { value: 'UAE', label: 'UAE' },
+        { value: 'Saudi Arabia', label: 'Saudi Arabia' }
+      ];
+    }
+    
+    // If Super Admin with specific country, only show that country
+    if (currentCountry === 'UAE' || currentCountry === 'Saudi Arabia') {
+      return [
+        { value: '', label: 'Select Country' },
+        { value: currentCountry, label: currentCountry }
+      ];
+    }
+    
+    // Default: show all options except "All"
+    return [
+      { value: '', label: 'Select Country' },
+      { value: 'UAE', label: 'UAE' },
+      { value: 'Saudi Arabia', label: 'Saudi Arabia' }
+    ];
+  });
+
+  readonly isCountryFieldDisabled = computed(() => {
+    // Disable country field if Super Admin with specific country is editing a user
+    if (this.isEditMode() && this.isSuperAdmin()) {
+      const currentCountry = this.currentUserCountry();
+      // If Super Admin has a specific country (not "All"), disable the field
+      if (currentCountry && currentCountry !== 'All') {
+        return true;
+      }
+    }
+    return false;
   });
 
   readonly accessibleDevelopers = computed(() => {
@@ -612,12 +668,20 @@ export class UserFormComponent implements OnInit {
   }
 
   private createEmptyForm(): UserFormState {
+    // Auto-set country based on logged-in Super Admin's country
+    const currentUser = this.authStore.user();
+    let defaultCountry: 'UAE' | 'Saudi Arabia' | 'All' | '' = '';
+    // Check role directly from authStore instead of using computed property (which may not be initialized yet)
+    if (currentUser?.role === 'Super Admin' && currentUser?.country && currentUser.country !== 'All') {
+      defaultCountry = currentUser.country as 'UAE' | 'Saudi Arabia';
+    }
+    
     return {
       name: '',
       email: '',
       phone: '',
       role: 'Admin',
-      country: '',
+      country: defaultCountry,
       image: null,
       imageFile: null,
       imagePreview: null,
@@ -657,7 +721,7 @@ export class UserFormComponent implements OnInit {
       email: user.email || '',
       phone: user.phone || '',
       role: (user.role as string) || 'User',
-      country: (user.country as 'UAE' | 'Saudi Arabia') || '',
+      country: (user.country as 'UAE' | 'Saudi Arabia' | 'All') || '',
       image: (user.logo || user.image) || null, // Backend uses 'logo', support both for compatibility
       imageFile: null,
       imagePreview: this.buildImagePreview(user.logo || user.image),
@@ -722,6 +786,24 @@ export class UserFormComponent implements OnInit {
         error: 'Please fill in all required fields.',
       }));
       return;
+    }
+
+    // Country validation for Super Admins
+    if (this.isSuperAdmin()) {
+      const currentUser = this.authStore.user();
+      const currentUserCountry = currentUser?.country;
+      
+      // If logged-in Super Admin has a specific country (not "All"), 
+      // ensure the form country matches it
+      if (currentUserCountry && currentUserCountry !== 'All') {
+        if (form.country !== currentUserCountry) {
+          this.userForm.update((f) => ({
+            ...f,
+            error: `You can only set the country to ${currentUserCountry} based on your account settings.`,
+          }));
+          return;
+        }
+      }
     }
 
     this.userForm.update((f) => ({ ...f, isSaving: true, error: null }));

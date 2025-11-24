@@ -43,22 +43,6 @@
         </label>
       }
 
-      @if (countryOptions().length > 0) {
-        <label class="flex flex-col gap-2 text-sm text-slate-600">
-          <span class="font-semibold text-slate-800">Select Country</span>
-          <select
-            class="w-64 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            [value]="selectedCountry() ?? ''"
-            (change)="onCountryChange($any($event.target).value)"
-          >
-            <option value="">All countries</option>
-            @for (country of countryOptions(); track country) {
-              <option [value]="country">{{ country }}</option>
-            }
-          </select>
-        </label>
-      }
-
       @if (!hasCameraConfigurationPermission()) {
         <button
           type="button"

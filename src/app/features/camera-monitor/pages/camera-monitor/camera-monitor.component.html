@@ -327,7 +327,7 @@
           (change)="onDeveloperSelect($any($event.target).value)"
         >
           <option value="">All developers</option>
-          @for (option of developers(); track option._id) {
+          @for (option of sortedDevelopers(); track option._id) {
             <option [value]="option._id">{{ option.developerName }}</option>
           }
         </select>
@@ -831,7 +831,7 @@
                               </button>
                             }
                             <!-- Photo dirty button - only for online (100% health) and maintenance -->
-                            @if (canTogglePhotoDirtyBetterView() && (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time')) {
+                            @if (shouldShowToggleButtons(camera)) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -847,7 +847,7 @@
                               </button>
                             }
                             <!-- Better view button - only for online (100% health) and maintenance -->
-                            @if (canTogglePhotoDirtyBetterView() && (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time')) {
+                            @if (shouldShowToggleButtons(camera)) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -922,6 +922,40 @@
                             }
                             @if (isCameraCountryUpdating(camera.id)) {
                               <span class="inline-flex h-2.5 w-2.5 animate-spin rounded-full border border-slate-300 border-t-emerald-500"></span>
+                            }
+                          </div>
+                        }
+                        @if (!isSuperAdmin() && canTogglePhotoDirtyBetterView()) {
+                          <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                            @if (shouldShowToggleButtons(camera)) {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  camera.maintenanceStatusPhotoDirty
+                                    ? 'border-rose-500 bg-rose-500 text-white shadow-lg shadow-rose-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover-border-rose-300 hover:text-rose-600'
+                                "
+                                (click)="togglePhotoDirty(camera)"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Photo dirty
+                              </button>
+                            }
+                            @if (shouldShowToggleButtons(camera)) {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
+                                [ngClass]="
+                                  camera.maintenanceStatusBetterView
+                                    ? 'border-indigo-500 bg-indigo-500 text-white shadow-lg shadow-indigo-200/40'
+                                    : 'border-slate-200 bg-white text-slate-600 hover-border-indigo-300 hover:text-indigo-600'
+                                "
+                                (click)="toggleBetterView(camera)"
+                                [disabled]="isCameraStatusUpdating(camera.id) || isCameraCountryUpdating(camera.id)"
+                              >
+                                Better view
+                              </button>
                             }
                           </div>
                         }
@@ -1360,7 +1394,7 @@
                               </button>
                             }
                             <!-- Photo dirty button - only for online (100% health) and maintenance -->
-                            @if (canTogglePhotoDirtyBetterView() && (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time')) {
+                            @if (shouldShowToggleButtons(camera)) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"
@@ -1376,7 +1410,7 @@
                               </button>
                             }
                             <!-- Better view button - only for online (100% health) and maintenance -->
-                            @if (canTogglePhotoDirtyBetterView() && (camera.status === 'online' || camera.status === 'maintenance' || camera.status === 'maintenance_hold' || camera.status === 'maintenance_long_time')) {
+                            @if (shouldShowToggleButtons(camera)) {
                               <button
                                 type="button"
                                 class="inline-flex items-center gap-2 rounded-full border px-3 py-1 transition"

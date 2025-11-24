@@ -9,6 +9,7 @@ import { DeveloperService } from '@core/services/developer.service';
 import { Project, ProjectInternalAttachment } from '@core/models/project.model';
 import { Developer } from '@core/models/developer.model';
 import { environment } from '@env';
+import { AuthStore } from '@core/auth/auth.store';
 
 interface ProjectFormState {
   projectName: string;
@@ -38,6 +39,7 @@ interface ProjectFormState {
 export class ProjectsOverviewComponent implements OnInit {
   private readonly projectService = inject(ProjectService);
   private readonly developerService = inject(DeveloperService);
+  private readonly authStore = inject(AuthStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly cdr = inject(ChangeDetectorRef);
 
@@ -45,8 +47,31 @@ export class ProjectsOverviewComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly projects = signal<Project[]>([]);
   readonly developers = signal<Developer[]>([]);
+  readonly isSuperAdmin = computed(() => this.authStore.user()?.role === 'Super Admin');
+  
+  // Filter developers by country
+  readonly filteredDevelopers = computed(() => {
+    let developers = this.developers();
+    const user = this.authStore.user();
+    
+    // Filter by country: Only users with "All" see all developers
+    if (user?.country && user.country !== 'All') {
+      developers = developers.filter((dev) => {
+        // Only show developers where address.country matches user's country
+        const devCountry = dev.address?.country || dev['country'];
+        return devCountry === user.country;
+      });
+    } else if (!user?.country) {
+      // If user has no country set, don't show any developers
+      developers = [];
+    }
+    // If country is "All", show all developers (no filtering)
+    
+    return developers;
+  });
+  
   readonly sortedDevelopers = computed(() => {
-    return [...this.developers()].sort((a, b) => {
+    return [...this.filteredDevelopers()].sort((a, b) => {
       const nameA = (a.developerName || '').toLowerCase();
       const nameB = (b.developerName || '').toLowerCase();
       return nameA.localeCompare(nameB);
@@ -69,7 +94,30 @@ export class ProjectsOverviewComponent implements OnInit {
 
   readonly filteredProjects = computed(() => {
     const term = this.searchTerm().toLowerCase().trim();
-    const projects = this.projects();
+    let projects = this.projects();
+    
+    // Filter projects by developer country: Only users with "All" see all projects
+    const user = this.authStore.user();
+    if (user?.country && user.country !== 'All') {
+      // Get list of developer IDs that match user's country
+      const allowedDeveloperIds = new Set(
+        this.filteredDevelopers().map(dev => dev._id)
+      );
+      
+      // Only show projects that belong to developers from user's country
+      projects = projects.filter((proj) => {
+        const projectDeveloperId = typeof proj.developer === 'object' 
+          ? (proj.developer as any)?._id 
+          : proj.developer;
+        return projectDeveloperId && allowedDeveloperIds.has(projectDeveloperId);
+      });
+    } else if (!user?.country) {
+      // If user has no country set, don't show any projects
+      projects = [];
+    }
+    // If country is "All", show all projects (no filtering)
+    
+    // Apply search filter
     const filtered = term
       ? projects.filter(
           (proj) =>

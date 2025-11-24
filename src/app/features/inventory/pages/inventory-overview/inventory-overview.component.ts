@@ -199,6 +199,35 @@ export class InventoryOverviewComponent implements OnInit {
     () => this.hasInventoryAccess() && !this.canSeeAllInventory(),
   );
 
+  // Filter developers by country
+  readonly filteredDevelopers = computed(() => {
+    let developers = this.developers();
+    const user = this.currentUser();
+    
+    // Filter by country: Only users with "All" see all developers
+    if (user?.country && user.country !== 'All') {
+      developers = developers.filter((dev) => {
+        // Only show developers where address.country matches user's country
+        const devCountry = dev.address?.country || dev['country'];
+        return devCountry === user.country;
+      });
+    } else if (!user?.country) {
+      // If user has no country set, don't show any developers
+      developers = [];
+    }
+    // If country is "All", show all developers (no filtering)
+    
+    return developers;
+  });
+
+  readonly sortedDevelopers = computed(() => {
+    return [...this.filteredDevelopers()].sort((a, b) => {
+      const nameA = (a.developerName || '').toLowerCase();
+      const nameB = (b.developerName || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+  });
+
   readonly developerMap = computed(() => new Map(this.developers().map((developer) => [developer._id, developer])));
   readonly projectMap = computed(() => new Map(this.allProjects().map((project) => [project._id, project])));
   readonly cameraMap = computed(() => new Map(this.allCameras().map((camera) => [camera._id, camera])));
@@ -335,6 +364,7 @@ export class InventoryOverviewComponent implements OnInit {
     serialNumber: string;
     model: string;
     estimatedAge: string;
+    country: string;
     error: string | null;
     isSaving: boolean;
   }>({
@@ -343,6 +373,7 @@ export class InventoryOverviewComponent implements OnInit {
     serialNumber: '',
     model: '',
     estimatedAge: '',
+    country: '',
     error: null,
     isSaving: false,
   });
@@ -1225,17 +1256,20 @@ export class InventoryOverviewComponent implements OnInit {
         serialNumber: item.device?.serialNumber || '',
         model: item.device?.model || '',
         estimatedAge: estimatedAgeString,
+        country: (item as any).country || '',
         error: null,
         isSaving: false,
       });
     } else {
-      // Create mode
+      // Create mode - default to user's country
+      const userCountry = this.currentUser()?.country || '';
       this.createDeviceState.set({
         itemId: null,
         type: this.deviceTypes()[0]?.name ?? '',
         serialNumber: '',
         model: '',
         estimatedAge: '',
+        country: userCountry,
         error: null,
         isSaving: false,
       });
@@ -1296,6 +1330,13 @@ export class InventoryOverviewComponent implements OnInit {
     }));
   }
 
+  onCreateDeviceCountryChange(value: string): void {
+    this.createDeviceState.update((state) => ({
+      ...state,
+      country: value,
+    }));
+  }
+
   saveCreateDevice(): void {
     const state = this.createDeviceState();
     if (!state.type.trim()) {
@@ -1331,6 +1372,11 @@ export class InventoryOverviewComponent implements OnInit {
         model: state.model.trim() ? state.model.trim() : undefined,
       },
     };
+    
+    // Include country if provided
+    if (state.country.trim()) {
+      payload['country'] = state.country.trim();
+    }
     
     // Include estimatedAge if it's a valid positive number
     if (estimatedAgeValue !== null && estimatedAgeValue > 0) {
@@ -1578,6 +1624,60 @@ export class InventoryOverviewComponent implements OnInit {
     return itemAgeStatus === ageStatus;
   }
 
+  private appliesCountryFilter(item: InventoryItem): boolean {
+    const user = this.authStore.user();
+    // Super Admins see all items regardless of country
+    if (this.isSuperAdmin()) {
+      return true;
+    }
+    
+    // If user has no country set, show all items
+    if (!user?.country) {
+      return true;
+    }
+
+    const userCountry = user.country;
+
+    // Check if item is assigned to a camera
+    const assignment = item.currentAssignment;
+    if (assignment?.camera) {
+      // Find the camera to check its country
+      const cameraId = typeof assignment.camera === 'object' && assignment.camera !== null
+        ? (assignment.camera as any)._id 
+        : assignment.camera;
+      const camera = this.allCameras().find(c => c._id === cameraId || c.camera === cameraId);
+      if (camera && camera['country']) {
+        return camera['country'] === userCountry;
+      }
+    }
+
+    // Check if item has assignedCameraId
+    if (item.assignedCameraId) {
+      const camera = this.allCameras().find(c => c._id === item.assignedCameraId);
+      if (camera && camera['country']) {
+        return camera['country'] === userCountry;
+      }
+    }
+
+    // Check if item is assigned to a developer (for items not yet assigned to cameras)
+    if (assignment?.developer) {
+      const devId = typeof assignment.developer === 'object' && assignment.developer !== null
+        ? (assignment.developer as any)._id 
+        : assignment.developer;
+      const developer = this.developers().find(d => d._id === devId);
+      if (developer) {
+        // Check address.country (preferred) or top-level country (fallback for legacy data)
+        const devCountry = developer.address?.country || developer['country'];
+        if (devCountry) {
+          return devCountry === userCountry;
+        }
+      }
+    }
+
+    // If no country information is available, show the item (to avoid hiding everything)
+    return true;
+  }
+
   private applyFilters(items: InventoryItem[]): InventoryItem[] {
     const deviceType = this.selectedDeviceType();
     const deviceModel = this.selectedDeviceModel();
@@ -1591,6 +1691,7 @@ export class InventoryOverviewComponent implements OnInit {
 
     let filtered = items.filter(
       (item) =>
+        this.appliesCountryFilter(item) &&
         this.appliesDeviceTypeFilter(item, deviceType) &&
         this.appliesDeviceModelFilter(item, deviceModel) &&
         this.appliesDeveloperFilter(item, developerId) &&

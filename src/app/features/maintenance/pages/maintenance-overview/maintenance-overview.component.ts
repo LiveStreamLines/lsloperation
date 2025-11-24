@@ -419,8 +419,29 @@ export class MaintenanceOverviewComponent implements OnInit {
       .map((type) => ({ value: type, label: type }));
   });
 
+  // Filter developers by country
+  readonly filteredDevelopers = computed(() => {
+    let developers = this.developers();
+    const user = this.authStore.user();
+    
+    // Filter by country: Only users with "All" see all developers
+    if (user?.country && user.country !== 'All') {
+      developers = developers.filter((dev) => {
+        // Only show developers where address.country matches user's country
+        const devCountry = dev.address?.country || dev['country'];
+        return devCountry === user.country;
+      });
+    } else if (!user?.country) {
+      // If user has no country set, don't show any developers
+      developers = [];
+    }
+    // If country is "All", show all developers (no filtering)
+    
+    return developers;
+  });
+
   readonly developerOptions = computed<FilterOption[]>(() =>
-    [...this.developers()]
+    [...this.filteredDevelopers()]
       .sort((a, b) => a.developerName.localeCompare(b.developerName))
       .map((developer) => ({ value: developer._id, label: developer.developerName })),
   );
@@ -501,6 +522,25 @@ export class MaintenanceOverviewComponent implements OnInit {
 
     return this.normalizedTasks()
       .filter((task) => {
+        // Country filtering: Apply to all users (including Super Admins with specific country)
+        // Super Admins with country "All" see all tasks
+        const user = this.authStore.user();
+        if (user?.country && user.country !== 'All') {
+          const userCountry = user.country;
+          // Check developer's country (cameras inherit country from their developer)
+          if (task.developerId) {
+            const developer = this.developers().find(d => d._id === task.developerId);
+            if (developer) {
+              // Check address.country (preferred) or top-level country (fallback for legacy data)
+              const devCountry = developer.address?.country || developer['country'];
+              if (devCountry && devCountry !== userCountry) {
+                return false; // Filter out tasks for cameras from different countries
+              }
+            }
+          }
+        }
+        // If user has country "All" or no country set, no country filtering is applied
+
         if (developerId && task.developerId !== developerId) {
           return false;
         }

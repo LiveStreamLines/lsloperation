@@ -104,9 +104,29 @@ export class UsersOverviewComponent implements OnInit {
 
   readonly filteredUsers = computed(() => {
     let filtered = [...this.users()];
+    const currentUser = this.authStore.user();
+    const currentUserCountry = currentUser?.country;
+    const isSuperAdminUser = this.isSuperAdmin();
 
     // Show only Super Admins and Admins in the overview
     filtered = filtered.filter((user) => user.role === 'Super Admin' || user.role === 'Admin');
+
+    // Apply country filtering
+    if (currentUserCountry === 'All') {
+      // If country is "All", show all users (no country filtering)
+      // All Super Admins and Admins will be shown regardless of their country
+    } else if (currentUserCountry) {
+      // Filter by specific country (UAE or Saudi Arabia)
+      const userCountry = currentUserCountry.trim();
+      filtered = filtered.filter((user) => {
+        // Match users with the same country (case-insensitive, handle empty/undefined)
+        const userCountryValue = (user.country || '').trim();
+        return userCountryValue && userCountryValue.toLowerCase() === userCountry.toLowerCase();
+      });
+    } else {
+      // If user has no country set, don't show any users
+      filtered = [];
+    }
 
     // Apply search filter
     const term = this.searchTerm().toLowerCase().trim();
@@ -119,15 +139,21 @@ export class UsersOverviewComponent implements OnInit {
       );
     }
 
-    // Apply access filters
+    // Apply role and access filters
     const developerId = this.selectedDeveloperId();
     const projectId = this.selectedProjectId();
     const cameraId = this.selectedCameraId();
     const selectedRole = this.selectedRole();
 
     filtered = filtered.filter((user) => {
-      const isAdmin = user.role === 'Super Admin';
       const matchesRole = selectedRole === 'ALL' || (user.role || '').trim() === selectedRole;
+      
+      // For Super Admins, only apply role filter (skip developer/project/camera filters)
+      if (isSuperAdminUser) {
+        return matchesRole;
+      }
+      
+      // For non-Super Admins, apply all access filters
       const matchesDeveloper =
         !developerId ||
         developerId === 'ALL' ||
@@ -144,8 +170,8 @@ export class UsersOverviewComponent implements OnInit {
         user.accessibleCameras?.includes(cameraId) ||
         user.accessibleCameras?.[0] === 'all';
 
-      if (this.isSuperAdmin() || this.accessibleDevelopers()[0] === 'all') {
-        return (isAdmin || (matchesDeveloper && matchesProject && matchesCamera)) && matchesRole;
+      if (this.accessibleDevelopers()[0] === 'all') {
+        return (matchesDeveloper && matchesProject && matchesCamera) && matchesRole;
       }
       return matchesDeveloper && matchesProject && matchesCamera && matchesRole;
     });

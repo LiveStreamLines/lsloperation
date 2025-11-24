@@ -21,6 +21,7 @@ export interface AuthenticatedUser {
   lastLoginAt?: string;
   phone?: string;
   status?: string;
+  country?: 'UAE' | 'Saudi Arabia' | 'All';
   [key: string]: unknown;
 }
 

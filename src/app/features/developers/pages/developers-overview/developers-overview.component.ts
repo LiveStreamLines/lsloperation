@@ -5,8 +5,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
 import { DeveloperService } from '@core/services/developer.service';
-import { Developer, DeveloperInternalAttachment } from '@core/models/developer.model';
+import { Developer, DeveloperInternalAttachment, DeveloperContact } from '@core/models/developer.model';
 import { environment } from '@env';
+import { AuthStore } from '@core/auth/auth.store';
 
 interface DeveloperFormState {
   developerName: string;
@@ -41,6 +42,7 @@ interface DeveloperFormState {
     iban: string;
     swiftCode: string;
   };
+  contacts: DeveloperContact[];
   logoFile: File | null;
   logoPreview: string | null;
   isSaving: boolean;
@@ -55,6 +57,7 @@ interface DeveloperFormState {
 })
 export class DevelopersOverviewComponent implements OnInit {
   private readonly developerService = inject(DeveloperService);
+  private readonly authStore = inject(AuthStore);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly isLoading = signal(true);
@@ -68,12 +71,34 @@ export class DevelopersOverviewComponent implements OnInit {
   readonly isAddMode = signal(false);
   readonly developerForm = signal<DeveloperFormState>(this.createEmptyForm());
 
+  readonly isSuperAdmin = computed(() => this.authStore.user()?.role === 'Super Admin');
+
   readonly filteredDevelopers = computed(() => {
+    let developers = this.developers();
+    
+    // Filter by country: Only users with "All" see all developers
+    const user = this.authStore.user();
+    if (user?.country && user.country !== 'All') {
+      const userCountry = user.country;
+      developers = developers.filter((dev) => {
+        // Only show developers where address.country matches user's country
+        // Check address.country (preferred) or top-level country (fallback for legacy data)
+        const devCountry = dev.address?.country || dev['country'];
+        // Only show if country matches user's country
+        return devCountry === userCountry;
+      });
+    } else if (!user?.country) {
+      // If user has no country set, don't show any developers
+      developers = [];
+    }
+    // If country is "All", show all developers (no filtering)
+    
+    // Apply search filter
     const term = this.searchTerm().toLowerCase().trim();
     if (!term) {
-      return this.developers();
+      return developers;
     }
-    return this.developers().filter(
+    return developers.filter(
       (dev) =>
         dev.developerName?.toLowerCase().includes(term) ||
         dev.developerTag?.toLowerCase().includes(term) ||
@@ -209,6 +234,50 @@ export class DevelopersOverviewComponent implements OnInit {
       });
   }
 
+  addContact(): void {
+    this.developerForm.update((state) => ({
+      ...state,
+      contacts: [
+        ...state.contacts,
+        {
+          name: '',
+          phone: '',
+          email: '',
+          designation: '',
+          notes: '',
+        },
+      ],
+      error: null,
+    }));
+  }
+
+  removeContact(index: number): void {
+    this.developerForm.update((state) => {
+      const updated = [...state.contacts];
+      updated.splice(index, 1);
+      return {
+        ...state,
+        contacts: updated,
+        error: null,
+      };
+    });
+  }
+
+  updateContactField(index: number, field: keyof DeveloperContact, value: string): void {
+    this.developerForm.update((state) => {
+      const updated = [...state.contacts];
+      updated[index] = {
+        ...updated[index],
+        [field]: value,
+      };
+      return {
+        ...state,
+        contacts: updated,
+        error: null,
+      };
+    });
+  }
+
   updateFormField(section: 'basic' | 'contact' | 'business' | 'address' | 'contactPerson' | 'bankDetails', field: string, value: string | boolean): void {
     this.developerForm.update((state) => {
       if (section === 'basic') {
@@ -316,6 +385,7 @@ export class DevelopersOverviewComponent implements OnInit {
         iban: '',
         swiftCode: '',
       },
+      contacts: [],
       logoFile: null,
       logoPreview: null,
       isSaving: false,
@@ -361,6 +431,7 @@ export class DevelopersOverviewComponent implements OnInit {
         iban: developer.bankDetails?.iban || '',
         swiftCode: developer.bankDetails?.swiftCode || '',
       },
+      contacts: developer.contacts ? [...developer.contacts] : [],
       logoFile: null,
       logoPreview,
       isSaving: false,
@@ -399,6 +470,12 @@ export class DevelopersOverviewComponent implements OnInit {
     formData.append('bankDetails[accountNumber]', form.bankDetails.accountNumber || '');
     formData.append('bankDetails[iban]', form.bankDetails.iban || '');
     formData.append('bankDetails[swiftCode]', form.bankDetails.swiftCode || '');
+    
+    // Append contacts array
+    if (form.contacts && form.contacts.length > 0) {
+      formData.append('contacts', JSON.stringify(form.contacts));
+    }
+    
     form.internalAttachments.forEach((file) => {
       formData.append('internalAttachments', file, file.name);
     });

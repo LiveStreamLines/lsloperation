@@ -325,10 +325,65 @@ export class CameraMonitorComponent implements OnInit {
   readonly canDeletePhoto = computed(
     () => this.isSuperAdmin() || ((this.currentUser() as any)?.canDeletePhoto ?? false),
   );
-  readonly canTogglePhotoDirtyBetterView = computed(
-    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canTogglePhotoDirtyBetterView ?? false),
-  );
-  readonly accessibleDevelopers = computed(() => this.currentUser()?.accessibleDevelopers ?? []);
+  readonly canTogglePhotoDirtyBetterView = computed(() => {
+    if (this.isSuperAdmin()) {
+      return true;
+    }
+    const user = this.currentUser();
+    if (!user) {
+      return false;
+    }
+    const permission = (user as any)?.canTogglePhotoDirtyBetterView;
+    if (permission === undefined || permission === null) {
+      return false;
+    }
+    if (typeof permission === 'boolean') {
+      return permission;
+    }
+    if (typeof permission === 'string') {
+      return permission.toLowerCase() === 'true';
+    }
+    return !!permission;
+  });
+
+  // Helper method to check if toggle buttons should be shown for a camera
+  shouldShowToggleButtons(camera: CameraViewModel): boolean {
+    const hasPermission = this.canTogglePhotoDirtyBetterView();
+    if (!hasPermission) {
+      return false;
+    }
+    const validStatuses = ['online', 'maintenance', 'maintenance_hold', 'maintenance_long_time'];
+    return validStatuses.includes(camera.status);
+  }
+  // Filter developers by country
+  readonly filteredDevelopersByCountry = computed(() => {
+    let developers = this.developers();
+    const user = this.currentUser();
+    
+    // Filter by country: Only users with "All" see all developers
+    if (user?.country && user.country !== 'All') {
+      developers = developers.filter((dev) => {
+        // Only show developers where address.country matches user's country
+        const devCountry = dev.address?.country || dev['country'];
+        return devCountry === user.country;
+      });
+    } else if (!user?.country) {
+      // If user has no country set, don't show any developers
+      developers = [];
+    }
+    // If country is "All", show all developers (no filtering)
+    
+    return developers;
+  });
+
+  // Sorted developers for dropdown (alphabetically)
+  readonly sortedDevelopers = computed(() => {
+    return [...this.filteredDevelopersByCountry()].sort((a, b) => {
+      const nameA = (a.developerName || '').toLowerCase();
+      const nameB = (b.developerName || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+  });
 
   readonly filteredCameras = computed<CameraViewModel[]>(() => {
     const cameras = this.cameraRecords();
@@ -339,14 +394,26 @@ export class CameraMonitorComponent implements OnInit {
     const search = this.searchTerm().trim().toLowerCase();
     // Always sort by developer/project/name
     const isSuperAdmin = this.isSuperAdmin();
-    const accessible = this.accessibleDevelopers();
 
     let list = cameras;
 
-    // Filter by accessibleDevelopers if not Super Admin
-    if (!isSuperAdmin && accessible.length > 0 && accessible[0] !== 'all') {
-      list = list.filter((camera) => accessible.includes(camera.developerId));
+    // Filter by developer country: Only users with "All" see all cameras
+    const user = this.currentUser();
+    if (user?.country && user.country !== 'All') {
+      // Get list of developer IDs that match user's country
+      const allowedDeveloperIds = new Set(
+        this.filteredDevelopersByCountry().map(dev => dev._id)
+      );
+      
+      // Only show cameras that belong to developers from user's country
+      list = list.filter((camera) => {
+        return camera.developerId && allowedDeveloperIds.has(camera.developerId);
+      });
+    } else if (!user?.country) {
+      // If user has no country set, don't show any cameras
+      list = [];
     }
+    // If country is "All", show all cameras (no filtering)
 
     if (developerId) {
       list = list.filter((camera) => camera.developerId === developerId);
@@ -532,6 +599,25 @@ export class CameraMonitorComponent implements OnInit {
       } catch {
         // ignore persistence errors (e.g. storage disabled)
       }
+    });
+
+    // Debug effect to log permission check
+    effect(() => {
+      const user = this.currentUser();
+      const isSuperAdmin = this.isSuperAdmin();
+      const permission = user ? (user as any)?.canTogglePhotoDirtyBetterView : undefined;
+      const hasPermission = this.canTogglePhotoDirtyBetterView();
+      
+      console.log('[DEBUG] canTogglePhotoDirtyBetterView check:', {
+        userId: user?.id,
+        userName: user?.name,
+        userRole: user?.role,
+        isSuperAdmin,
+        permissionValue: permission,
+        permissionType: typeof permission,
+        hasPermission,
+        fullUser: user,
+      });
     });
 
     const interval = setInterval(() => {
@@ -1419,19 +1505,28 @@ export class CameraMonitorComponent implements OnInit {
         }),
       )
       .subscribe(([developers, projects, cameras, lastPictures, memories]) => {
-        // Filter developers based on user's accessibleDevelopers
+        // Filter developers based on user's country
         let filteredDevelopers = developers;
         let filteredCameras = cameras;
         const user = this.currentUser();
         if (user && !this.isSuperAdmin()) {
-          const accessible = this.accessibleDevelopers();
-          if (accessible.length > 0 && accessible[0] !== 'all') {
-            filteredDevelopers = developers.filter((dev) => accessible.includes(dev._id));
-            // Filter cameras to only show those from accessible developers
+          if (user.country && user.country !== 'All') {
+            const userCountry = user.country;
+            // Filter developers by country
+            filteredDevelopers = developers.filter((dev) => {
+              const devCountry = dev.address?.country || dev['country'];
+              return devCountry === userCountry;
+            });
+            // Filter cameras to only show those from developers in user's country
+            const allowedDeveloperIds = new Set(filteredDevelopers.map(dev => dev._id));
             filteredCameras = cameras.filter((camera) => {
               const developerId = this.extractId(camera.developer);
-              return developerId && accessible.includes(developerId);
+              return developerId && allowedDeveloperIds.has(developerId);
             });
+          } else {
+            // If user has no country set, don't show any developers or cameras
+            filteredDevelopers = [];
+            filteredCameras = [];
           }
         }
         this.developers.set(this.sortByName(filteredDevelopers, (item) => item.developerName));
@@ -1475,13 +1570,23 @@ export class CameraMonitorComponent implements OnInit {
             let finalCameras = cameras;
             let finalDevelopers = developers;
             if (user && !this.isSuperAdmin()) {
-              const accessible = this.accessibleDevelopers();
-              if (accessible.length > 0 && accessible[0] !== 'all') {
-                finalDevelopers = developers.filter((dev) => accessible.includes(dev._id));
+              if (user.country && user.country !== 'All') {
+                const userCountry = user.country;
+                // Filter developers by country
+                finalDevelopers = developers.filter((dev) => {
+                  const devCountry = dev.address?.country || dev['country'];
+                  return devCountry === userCountry;
+                });
+                // Filter cameras to only show those from developers in user's country
+                const allowedDeveloperIds = new Set(finalDevelopers.map(dev => dev._id));
                 finalCameras = cameras.filter((camera) => {
                   const developerId = this.extractId(camera.developer);
-                  return developerId && accessible.includes(developerId);
+                  return developerId && allowedDeveloperIds.has(developerId);
                 });
+              } else {
+                // If user has no country set, don't show any developers or cameras
+                finalDevelopers = [];
+                finalCameras = [];
               }
             }
             this.cameraRecords.set(
