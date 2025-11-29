@@ -229,7 +229,7 @@
                   required
                 >
                   <option value="">Select assignee</option>
-                  @for (user of users(); track user._id) {
+                  @for (user of filteredUsers(); track user._id) {
                     <option [value]="user._id">{{ user.name }}</option>
                   }
                 </select>
@@ -243,7 +243,7 @@
                   (change)="updateFormField('approver', $any($event.target).value || null)"
                 >
                   <option value="">No approver</option>
-                  @for (user of users(); track user._id) {
+                  @for (user of filteredUsers(); track user._id) {
                     <option [value]="user._id">{{ user.name }}</option>
                   }
                 </select>

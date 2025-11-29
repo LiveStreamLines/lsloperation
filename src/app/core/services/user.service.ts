@@ -9,7 +9,7 @@ import { map, shareReplay, tap } from 'rxjs/operators';
   providedIn: 'root',
 })
 export class UserService {
-  private readonly baseUrl = `${environment.apiUrl}/users`;
+  private readonly baseUrl = `${environment.apiUrl}/operationusers`;
 
   private cache: User[] | null = null;
   private request$?: Observable<User[]>;

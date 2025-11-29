@@ -52,11 +52,6 @@ type CameraStatus =
 
 type CameraStatusFilter = 'all' | CameraStatus | 'maintenance_less_images' | 'maintenance_photo_dirty' | 'maintenance_better_view' | 'maintenance_wrong_time' | 'maintenance_shutter_expiry' | 'device_expired' | 'memory_full';
 
-interface CountryOption {
-  value: string;
-  label: string;
-}
-
 interface CameraViewModel {
   id: string;
   name: string;
@@ -170,7 +165,6 @@ type SortMode = 'developer' | 'server';
 const UPDATE_THRESHOLD_MINUTES = 60;
 const MAINTENANCE_THRESHOLD_DAYS = 30;
 const FILTER_STORAGE_KEY = 'camera-monitor-filters';
-const NO_COUNTRY_VALUE = '__no_country__';
 const ALLOWED_COUNTRIES = ['Saudi Arabia', 'UAE'] as const;
 
 @Component({
@@ -221,7 +215,6 @@ export class CameraMonitorComponent implements OnInit {
 
   readonly selectedDeveloperId = signal<string | null>(null);
   readonly selectedProjectId = signal<string | null>(null);
-  readonly selectedCountry = signal<string | null>(null);
   readonly selectedCameraStatus = signal<CameraStatusFilter>('all');
   readonly sortMode = signal<SortMode>('developer');
   readonly searchTerm = signal('');
@@ -288,32 +281,24 @@ export class CameraMonitorComponent implements OnInit {
     { value: 'maintenance_long_time', label: 'Maintenance / long time' },
     { value: 'finished', label: 'Finished' },
   ];
-  readonly noCountryValue = NO_COUNTRY_VALUE;
   readonly allowedCountries = ALLOWED_COUNTRIES;
-
-  readonly countryOptions = computed<CountryOption[]>(() => {
-    const values = new Set<string>();
-    let hasUnset = false;
-    for (const camera of this.cameraRecords()) {
-      const country = (camera.country ?? '').trim();
-      if (country.length > 0) {
-        values.add(country);
-      } else {
-        hasUnset = true;
-      }
-    }
-    const options = Array.from(values)
-      .sort((a, b) => a.localeCompare(b))
-      .map<CountryOption>((value) => ({ value, label: value }));
-    if (hasUnset) {
-      options.push({ value: NO_COUNTRY_VALUE, label: 'No country' });
-    }
-    return options;
-  });
 
   readonly isSuperAdmin = computed(() => this.authStore.user()?.role === 'Super Admin');
   readonly currentUserName = computed(() => this.authStore.user()?.name ?? 'System');
   readonly currentUser = computed(() => this.authStore.user());
+
+  // Filter users by current user's country
+  readonly filteredUsers = computed(() => {
+    const allUsers = this.users();
+    const currentUser = this.currentUser();
+    
+    if (!currentUser?.country || currentUser.country === 'All') {
+      return allUsers;
+    }
+    
+    // Only show users from the same country
+    return allUsers.filter((user) => user.country === currentUser.country);
+  });
   
   // Permission checks
   readonly canCreateTask = computed(
@@ -389,7 +374,6 @@ export class CameraMonitorComponent implements OnInit {
     const cameras = this.cameraRecords();
     const developerId = this.selectedDeveloperId();
     const projectId = this.selectedProjectId();
-    const countryFilter = this.selectedCountry();
     const statusFilter = this.selectedCameraStatus();
     const search = this.searchTerm().trim().toLowerCase();
     // Always sort by developer/project/name
@@ -421,17 +405,6 @@ export class CameraMonitorComponent implements OnInit {
 
     if (projectId) {
       list = list.filter((camera) => camera.projectId === projectId);
-    }
-
-    if (countryFilter) {
-      if (countryFilter === NO_COUNTRY_VALUE) {
-        list = list.filter((camera) => !camera.country || camera.country.trim().length === 0);
-      } else {
-        const normalizedCountry = countryFilter.toLowerCase();
-        list = list.filter(
-          (camera) => (camera.country ?? '').trim().toLowerCase() === normalizedCountry,
-        );
-      }
     }
 
     if (statusFilter !== 'all') {
@@ -577,7 +550,6 @@ export class CameraMonitorComponent implements OnInit {
     let count = 0;
     if (this.selectedDeveloperId()) count += 1;
     if (this.selectedProjectId()) count += 1;
-    if (this.selectedCountry()) count += 1;
     if (this.selectedCameraStatus() !== 'all') count += 1;
     if (this.searchTerm().trim().length > 0) count += 1;
     return count;
@@ -590,7 +562,6 @@ export class CameraMonitorComponent implements OnInit {
       const filters = {
         developerId: this.selectedDeveloperId(),
         projectId: this.selectedProjectId(),
-        country: this.selectedCountry(),
         status: this.selectedCameraStatus(),
         search: this.searchTerm(),
       };
@@ -634,10 +605,6 @@ export class CameraMonitorComponent implements OnInit {
   onDeveloperSelect(value: string): void {
     this.selectedDeveloperId.set(value || null);
     this.selectedProjectId.set(null);
-  }
-
-  onCountrySelect(value: string | null): void {
-    this.selectedCountry.set(value);
   }
 
   onProjectSelect(value: string): void {
@@ -706,7 +673,6 @@ export class CameraMonitorComponent implements OnInit {
   clearFilters(): void {
     this.selectedDeveloperId.set(null);
     this.selectedProjectId.set(null);
-    this.selectedCountry.set(null);
     this.selectedCameraStatus.set('all');
     // sortMode is always 'developer', no need to reset
     this.searchTerm.set('');
@@ -1086,7 +1052,7 @@ export class CameraMonitorComponent implements OnInit {
   }
 
   getTaskAssignedUserLabel(userId: string): string {
-    const user = this.users().find((u) => u._id === userId);
+    const user = this.filteredUsers().find((u) => u._id === userId) || this.users().find((u) => u._id === userId);
     return user ? `${user.name} (${user.role})` : userId;
   }
 
@@ -2183,14 +2149,12 @@ export class CameraMonitorComponent implements OnInit {
       const parsed = JSON.parse(stored) as {
         developerId?: string | null;
         projectId?: string | null;
-        country?: string | null;
         status?: CameraStatusFilter;
         sortMode?: SortMode;
         search?: string;
       };
       this.selectedDeveloperId.set(parsed.developerId ?? null);
       this.selectedProjectId.set(parsed.projectId ?? null);
-      this.selectedCountry.set(parsed.country ?? null);
       this.selectedCameraStatus.set(parsed.status ?? 'all');
       // sortMode is always 'developer' now, no need to restore
       this.searchTerm.set(parsed.search ?? '');

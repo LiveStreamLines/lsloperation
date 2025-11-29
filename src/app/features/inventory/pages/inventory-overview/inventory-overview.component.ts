@@ -231,7 +231,21 @@ export class InventoryOverviewComponent implements OnInit {
   readonly developerMap = computed(() => new Map(this.developers().map((developer) => [developer._id, developer])));
   readonly projectMap = computed(() => new Map(this.allProjects().map((project) => [project._id, project])));
   readonly cameraMap = computed(() => new Map(this.allCameras().map((camera) => [camera._id, camera])));
-  readonly adminMap = computed(() => new Map(this.admins().map((admin) => [admin._id, admin])));
+  
+  // Filter admins by current user's country
+  readonly filteredAdmins = computed(() => {
+    const allAdmins = this.admins();
+    const currentUser = this.authStore.user();
+    
+    if (!currentUser?.country || currentUser.country === 'All') {
+      return allAdmins;
+    }
+    
+    // Only show admins from the same country
+    return allAdmins.filter((admin) => admin.country === currentUser.country);
+  });
+  
+  readonly adminMap = computed(() => new Map(this.filteredAdmins().map((admin) => [admin._id, admin])));
   readonly deviceTypeMapByName = computed(() => {
     const map = new Map<string, DeviceType>();
     for (const type of this.deviceTypes()) {

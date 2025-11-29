@@ -468,8 +468,21 @@ export class MaintenanceOverviewComponent implements OnInit {
       }));
   });
 
+  // Filter users by current user's country
+  readonly filteredUsers = computed(() => {
+    const allUsers = this.users();
+    const currentUser = this.authStore.user();
+    
+    if (!currentUser?.country || currentUser.country === 'All') {
+      return allUsers;
+    }
+    
+    // Only show users from the same country
+    return allUsers.filter((user) => user.country === currentUser.country);
+  });
+
   readonly assignedUserOptions = computed<FilterOption[]>(() =>
-    [...this.users()]
+    [...this.filteredUsers()]
       .filter((user) => user.role === 'Admin' || user.role === 'Super Admin')
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((user) => ({
@@ -488,7 +501,7 @@ export class MaintenanceOverviewComponent implements OnInit {
       }
     });
 
-    return [...this.users()]
+    return [...this.filteredUsers()]
       .filter((user) => assignedByUserIds.has(user._id))
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((user) => ({
@@ -500,6 +513,7 @@ export class MaintenanceOverviewComponent implements OnInit {
   readonly developerMap = computed(() => new Map(this.developers().map((dev) => [dev._id, dev])));
   readonly projectMap = computed(() => new Map(this.projects().map((proj) => [proj._id, proj])));
   readonly cameraMap = computed(() => new Map(this.cameras().map((cam) => [cam._id, cam])));
+  // userMap includes all users for lookups (existing assignments), but filteredUsers is for dropdowns
   readonly userMap = computed(() => new Map(this.users().map((user) => [user._id, user])));
 
   readonly normalizedTasks = computed<UiMaintenance[]>(() => {

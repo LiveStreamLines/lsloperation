@@ -913,7 +913,7 @@
               (change)="onAssignUserAdminChange($any($event.target).value)"
             >
               <option value="">Select user</option>
-              @for (admin of admins(); track admin._id) {
+              @for (admin of filteredAdmins(); track admin._id) {
                 <option [value]="admin._id">{{ admin.name }} ({{ admin.role }})</option>
               }
             </select>

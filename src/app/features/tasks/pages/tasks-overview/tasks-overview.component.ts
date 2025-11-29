@@ -50,6 +50,19 @@ export class TasksOverviewComponent implements OnInit {
 
   readonly currentUser = computed(() => this.authStore.user());
 
+  // Filter users by current user's country
+  readonly filteredUsers = computed(() => {
+    const allUsers = this.users();
+    const currentUser = this.currentUser();
+    
+    if (!currentUser?.country || currentUser.country === 'All') {
+      return allUsers;
+    }
+    
+    // Only show users from the same country
+    return allUsers.filter((user) => user.country === currentUser.country);
+  });
+
   readonly taskTypes: { value: TaskType; label: string }[] = [
     { value: 'purchase_request', label: 'Purchase Request' },
     { value: 'site_visit_request', label: 'Site Visit Request' },
