@@ -367,7 +367,8 @@ export class ContactsOverviewComponent implements OnInit {
   getCameraName(cameraId: string | null | undefined): string {
     if (!cameraId) return '—';
     const camera = this.cameras().find((c) => c._id === cameraId);
-    return camera?.cameraName || '—';
+    if (!camera) return '—';
+    return (camera.cameraDescription as string) || (camera.camera as string) || '—';
   }
 
   getAssociationLabel(contact: Contact): string {

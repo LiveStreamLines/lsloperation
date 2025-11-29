@@ -113,7 +113,7 @@
           >
             <option value="">All cameras</option>
             @for (camera of filteredCameras(); track camera._id) {
-              <option [value]="camera._id">{{ camera.cameraName }}</option>
+              <option [value]="camera._id">{{ (camera.cameraDescription || camera.camera) || '—' }}</option>
             }
           </select>
         </label>
