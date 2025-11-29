@@ -112,6 +112,13 @@ const routes: Routes = [
             (m) => m.MemoriesOverviewComponent,
           ),
       },
+      {
+        path: 'contacts',
+        loadComponent: () =>
+          import('@features/contacts/pages/contacts-overview/contacts-overview.component').then(
+            (m) => m.ContactsOverviewComponent,
+          ),
+      },
     ],
   },
 ];

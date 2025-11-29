@@ -111,19 +111,50 @@ export class MemoriesOverviewComponent implements OnInit {
 
   readonly userRole = computed(() => this.authStore.user()?.role ?? 'Viewer');
   readonly userName = computed(() => this.authStore.user()?.name ?? 'System');
+  readonly userId = computed(() => {
+    const user = this.authStore.user();
+    return (user as any)?.['_id'] || (user as any)?.id || null;
+  });
   readonly isSuperAdmin = computed(() => this.authStore.user()?.role === 'Super Admin');
+  
+  // Permission checks
+  readonly hasMemoryAccess = computed(() => {
+    const user = this.authStore.user();
+    return this.isSuperAdmin() || ((user as any)?.hasMemoryAccess ?? false);
+  });
+  
+  readonly canArchiveMemory = computed(() => {
+    const user = this.authStore.user();
+    return this.isSuperAdmin() || ((user as any)?.canArchiveMemory ?? false);
+  });
 
   readonly showLowMemoryToggle = computed(() => this.selectedStatus() === 'active');
 
   readonly statusOptions = computed<FilterOption[]>(() => {
     const role = this.memoryRole();
-    if (role === 'removal') {
-      return this.baseStatusOptions.filter((option) => option.value === 'active');
+    
+    // Super Admin and users with archive memory permission see all statuses
+    if (this.isSuperAdmin() || this.canArchiveMemory()) {
+      if (role === 'removal') {
+        return this.baseStatusOptions.filter((option) => option.value === 'active');
+      }
+      if (role === 'archiver') {
+        return this.baseStatusOptions.filter((option) => option.value === 'removed');
+      }
+      return this.baseStatusOptions;
     }
-    if (role === 'archiver') {
-      return this.baseStatusOptions.filter((option) => option.value === 'removed');
+    
+    // Users with memory access see Active and Removed
+    if (this.hasMemoryAccess()) {
+      return this.baseStatusOptions.filter((option) => 
+        option.value === 'all' || option.value === 'active' || option.value === 'removed'
+      );
     }
-    return this.baseStatusOptions;
+    
+    // Users without memory access only see Removed (memories they removed)
+    return this.baseStatusOptions.filter((option) => 
+      option.value === 'all' || option.value === 'removed'
+    );
   });
 
   // Filter developers by country
@@ -240,9 +271,10 @@ export class MemoriesOverviewComponent implements OnInit {
     this.memories().map((memory) => this.decorateMemory(memory)),
   );
 
-  readonly filteredMemories = computed<UiMemory[]>(() =>
-    this.applyFilters(this.normalizedMemories()),
-  );
+  readonly filteredMemories = computed<UiMemory[]>(() => {
+    const filtered = this.applyFilters(this.normalizedMemories());
+    return this.sortMemoriesByLastAction(filtered);
+  });
 
   readonly metricCards = computed<MemoryMetricCard[]>(() => {
     const list = this.filteredMemories();
@@ -308,6 +340,11 @@ export class MemoriesOverviewComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Auto-select "Removed" status for users without memory access
+    if (!this.hasMemoryAccess() && !this.canArchiveMemory() && !this.isSuperAdmin()) {
+      this.selectedStatus.set('removed');
+    }
+    
     this.loadReferenceData();
     this.loadMemories();
   }
@@ -349,13 +386,19 @@ export class MemoriesOverviewComponent implements OnInit {
     this.selectedProject.set(null);
     this.selectedCamera.set(null);
 
-    const role = this.memoryRole();
-    if (role === 'removal') {
-      this.selectedStatus.set('active');
-    } else if (role === 'archiver') {
+    // Set default status based on permissions
+    if (!this.hasMemoryAccess() && !this.canArchiveMemory() && !this.isSuperAdmin()) {
+      // Users without memory access default to "removed" (only see their removed memories)
       this.selectedStatus.set('removed');
     } else {
-      this.selectedStatus.set(null);
+      const role = this.memoryRole();
+      if (role === 'removal') {
+        this.selectedStatus.set('active');
+      } else if (role === 'archiver') {
+        this.selectedStatus.set('removed');
+      } else {
+        this.selectedStatus.set(null);
+      }
     }
 
     this.showLowMemoryOnly.set(false);
@@ -396,10 +439,7 @@ export class MemoriesOverviewComponent implements OnInit {
       return false;
     }
     const role = this.memoryRole();
-    const userRole = this.userRole();
-    const user = this.authStore.user();
-    const canArchiveMemory = (user as any)?.canArchiveMemory ?? false;
-    return role === 'archiver' || userRole === 'Super Admin' || canArchiveMemory;
+    return role === 'archiver' || this.isSuperAdmin() || this.canArchiveMemory();
   }
 
   isUpdating(id: string): boolean {
@@ -576,8 +616,44 @@ export class MemoriesOverviewComponent implements OnInit {
     const lowOnly = this.showLowMemoryOnly();
 
     return memories.filter((memory) => {
-      // Country filtering: Only users with "All" see all memories
+      // Permission-based filtering
       const user = this.authStore.user();
+      const currentUserName = this.userName();
+      
+      // Super Admin can see everything
+      if (this.isSuperAdmin()) {
+        // Continue to other filters
+      }
+      // User with archive memory permission can see all memories
+      else if (this.canArchiveMemory()) {
+        // Continue to other filters
+      }
+      // User with memory access can see active memories + memories removed by them
+      else if (this.hasMemoryAccess()) {
+        // Show active memories
+        if (memory.status === 'active') {
+          // Continue to other filters
+        }
+        // Show memories removed by this user
+        else if (memory.status === 'removed' && memory.removalUser === currentUserName) {
+          // Continue to other filters
+        }
+        // Hide everything else
+        else {
+          return false;
+        }
+      }
+      // User without memory access can only see memories removed by them
+      else {
+        // Only show memories removed by this user
+        if (memory.status === 'removed' && memory.removalUser === currentUserName) {
+          // Continue to other filters
+        } else {
+          return false;
+        }
+      }
+
+      // Country filtering: Only users with "All" see all memories
       if (user?.country && user.country !== 'All') {
         const userCountry = user.country;
         // Check camera's country first
@@ -629,6 +705,54 @@ export class MemoriesOverviewComponent implements OnInit {
         return false;
       }
       return true;
+    });
+  }
+
+  private sortMemoriesByLastAction(memories: UiMemory[]): UiMemory[] {
+    return [...memories].sort((a, b) => {
+      // Helper to parse date string to timestamp
+      const parseDate = (dateStr: string | undefined): number | null => {
+        if (!dateStr || typeof dateStr !== 'string' || dateStr.trim() === '') {
+          return null;
+        }
+        const date = new Date(dateStr);
+        return Number.isNaN(date.getTime()) ? null : date.getTime();
+      };
+
+      // Get last state date (archived > removed > creation date)
+      const getLastStateDate = (memory: UiMemory): number => {
+        const raw = memory.raw;
+        
+        // Priority 1: dateOfReceive (archived date) - most recent state change
+        const archivedDate = parseDate(memory.dateOfReceive) || parseDate(raw?.dateOfReceive);
+        if (archivedDate !== null) {
+          return archivedDate;
+        }
+
+        // Priority 2: dateOfRemoval (removed date) - second most recent state change
+        const removedDate = parseDate(memory.dateOfRemoval) || parseDate(raw?.dateOfRemoval);
+        if (removedDate !== null) {
+          return removedDate;
+        }
+
+        // Priority 3: creation date (startDate/createdDate) - fallback
+        const createdDate = parseDate(memory.startDate) || parseDate(raw?.createdDate);
+        if (createdDate !== null) {
+          return createdDate;
+        }
+
+        // If no date found, return 0 (will be sorted to the end)
+        return 0;
+      };
+
+      const timestampA = getLastStateDate(a);
+      const timestampB = getLastStateDate(b);
+
+      // Sort by last state date descending (most recent/newest first)
+      // JavaScript sort: negative = a before b, positive = b before a, 0 = equal
+      // For descending (newest first): if B is newer (timestampB > timestampA), return positive to put B before A
+      // This means: timestampB - timestampA gives positive when B is newer, which puts B before A (newest first)
+      return timestampB - timestampA;
     });
   }
 

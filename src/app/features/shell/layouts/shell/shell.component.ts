@@ -128,14 +128,25 @@ export class ShellComponent {
       description: 'Preventive tasks and escalations',
     });
 
-    // Memories - Super Admin or users with memory access
-    if (isSuperAdmin || (currentUser as any).hasMemoryAccess) {
+    // Memories - All authenticated users can see the module
+    // Permission-based filtering is handled in the component itself
+    items.push({
+      label: 'Memories',
+      path: '/memories',
+      description: 'Marketing assets and curated media',
+    });
+
+    // Contacts - Super Admin or users with developer/project/camera management access
+    if (isSuperAdmin || hasAllPermission) {
       items.push({
-        label: 'Memories',
-        path: '/memories',
-        description: 'Marketing assets and curated media',
+        label: 'Contacts',
+        path: '/contacts',
+        description: 'Manage contacts for developers, projects, and cameras',
       });
     }
+
+    // Debug: Log to verify items are being added
+    console.log('Navigation items:', items.map(i => i.label));
 
     return items;
   });
