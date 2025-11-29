@@ -119,6 +119,20 @@ const routes: Routes = [
             (m) => m.ContactsOverviewComponent,
           ),
       },
+      {
+        path: 'tasks',
+        loadComponent: () =>
+          import('@features/tasks/pages/tasks-overview/tasks-overview.component').then(
+            (m) => m.TasksOverviewComponent,
+          ),
+      },
+      {
+        path: 'tasks/:id',
+        loadComponent: () =>
+          import('@features/tasks/pages/task-details/task-details.component').then(
+            (m) => m.TaskDetailsComponent,
+          ),
+      },
     ],
   },
 ];

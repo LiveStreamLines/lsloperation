@@ -145,6 +145,13 @@ export class ShellComponent {
       });
     }
 
+    // Tasks - All authenticated users can see the module
+    items.push({
+      label: 'Tasks',
+      path: '/tasks',
+      description: 'Internal task management and ticketing system',
+    });
+
     // Debug: Log to verify items are being added
     console.log('Navigation items:', items.map(i => i.label));
 

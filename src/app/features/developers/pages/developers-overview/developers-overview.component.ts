@@ -5,7 +5,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
 import { DeveloperService } from '@core/services/developer.service';
-import { Developer, DeveloperInternalAttachment, DeveloperContact } from '@core/models/developer.model';
+import { Developer, DeveloperInternalAttachment } from '@core/models/developer.model';
 import { environment } from '@env';
 import { AuthStore } from '@core/auth/auth.store';
 
@@ -42,7 +42,6 @@ interface DeveloperFormState {
     iban: string;
     swiftCode: string;
   };
-  contacts: DeveloperContact[];
   logoFile: File | null;
   logoPreview: string | null;
   isSaving: boolean;
@@ -234,50 +233,6 @@ export class DevelopersOverviewComponent implements OnInit {
       });
   }
 
-  addContact(): void {
-    this.developerForm.update((state) => ({
-      ...state,
-      contacts: [
-        ...state.contacts,
-        {
-          name: '',
-          phone: '',
-          email: '',
-          designation: '',
-          notes: '',
-        },
-      ],
-      error: null,
-    }));
-  }
-
-  removeContact(index: number): void {
-    this.developerForm.update((state) => {
-      const updated = [...state.contacts];
-      updated.splice(index, 1);
-      return {
-        ...state,
-        contacts: updated,
-        error: null,
-      };
-    });
-  }
-
-  updateContactField(index: number, field: keyof DeveloperContact, value: string): void {
-    this.developerForm.update((state) => {
-      const updated = [...state.contacts];
-      updated[index] = {
-        ...updated[index],
-        [field]: value,
-      };
-      return {
-        ...state,
-        contacts: updated,
-        error: null,
-      };
-    });
-  }
-
   updateFormField(section: 'basic' | 'contact' | 'business' | 'address' | 'contactPerson' | 'bankDetails', field: string, value: string | boolean): void {
     this.developerForm.update((state) => {
       if (section === 'basic') {
@@ -385,7 +340,6 @@ export class DevelopersOverviewComponent implements OnInit {
         iban: '',
         swiftCode: '',
       },
-      contacts: [],
       logoFile: null,
       logoPreview: null,
       isSaving: false,
@@ -431,7 +385,6 @@ export class DevelopersOverviewComponent implements OnInit {
         iban: developer.bankDetails?.iban || '',
         swiftCode: developer.bankDetails?.swiftCode || '',
       },
-      contacts: developer.contacts ? [...developer.contacts] : [],
       logoFile: null,
       logoPreview,
       isSaving: false,
@@ -470,11 +423,6 @@ export class DevelopersOverviewComponent implements OnInit {
     formData.append('bankDetails[accountNumber]', form.bankDetails.accountNumber || '');
     formData.append('bankDetails[iban]', form.bankDetails.iban || '');
     formData.append('bankDetails[swiftCode]', form.bankDetails.swiftCode || '');
-    
-    // Append contacts array
-    if (form.contacts && form.contacts.length > 0) {
-      formData.append('contacts', JSON.stringify(form.contacts));
-    }
     
     form.internalAttachments.forEach((file) => {
       formData.append('internalAttachments', file, file.name);
