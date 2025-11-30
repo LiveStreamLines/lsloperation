@@ -17,8 +17,8 @@ type LegacyLoginResponse = Partial<LoginResponse> & {
   providedIn: 'root',
 })
 export class AuthService {
-  private readonly loginEndpoint = `${environment.apiUrl}/auth/login`;
-  private readonly logoutEndpoint = `${environment.apiUrl}/auth/logout`;
+  private readonly loginEndpoint = `${environment.apiUrl}/operation-auth/login`;
+  private readonly logoutEndpoint = `${environment.apiUrl}/operation-auth/logout`;
 
   constructor(
     private readonly http: HttpClient,
