@@ -2774,7 +2774,11 @@ export class MaintenanceOverviewComponent implements OnInit {
   }
 
   getAttachmentUrl(attachment: MaintenanceAttachment): string {
-    // Build full URL from attachment path
+    // If URL is already a full S3 URL (starts with http:// or https://), return it as-is
+    if (attachment.url.startsWith('http://') || attachment.url.startsWith('https://')) {
+      return attachment.url;
+    }
+    // Build full URL from attachment path for local storage
     const url = attachment.url.startsWith('/') ? attachment.url.slice(1) : attachment.url;
     const mediaBaseUrl = environment.apiUrl.replace('/api', '');
     return `${mediaBaseUrl}/${url}`;
