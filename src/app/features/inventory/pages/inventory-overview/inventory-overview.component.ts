@@ -174,6 +174,12 @@ export class InventoryOverviewComponent implements OnInit {
   ];
 
   readonly currentUser = computed(() => this.authStore.user());
+  readonly currentUserId = computed(() => {
+    const user = this.authStore.user();
+    if (!user) return null;
+    // Get user ID - try both 'id' and '_id' fields to handle different data formats
+    return (user.id || (user as any)?.['_id'] || (user as any)?._id) as string | null;
+  });
   readonly isSuperAdmin = computed(() => this.currentUser()?.role === 'Super Admin');
   readonly accessibleDevelopers = computed(() => this.currentUser()?.accessibleDevelopers ?? []);
   
@@ -376,10 +382,12 @@ export class InventoryOverviewComponent implements OnInit {
   readonly unassignUserModalItem = signal<InventoryItem | null>(null);
   readonly unassignUserState = signal<{
     reason: string;
+    quantity: string;
     error: string | null;
     isSaving: boolean;
   }>({
     reason: '',
+    quantity: '1',
     error: null,
     isSaving: false,
   });
@@ -442,22 +450,57 @@ export class InventoryOverviewComponent implements OnInit {
 
   readonly metricCards = computed<InventoryMetricCard[]>(() => {
     const list = this.filteredItems();
-    const total = list.length;
+    
+    // Total inventory: sum of all item quantities
+    const total = list.reduce((sum, item) => sum + this.getItemQuantity(item), 0);
 
-    const assigned = list.filter((item) => this.normalizeStatus(item.status) === 'assigned').length;
-    const userAssigned = list.filter((item) => this.normalizeStatus(item.status) === 'user_assigned').length;
-    const available = list.filter((item) => this.normalizeStatus(item.status) === 'available').length;
-    const retired = list.filter((item) => {
+    // Projects: sum quantities of items assigned to projects
+    const assignedItems = list.filter((item) => this.normalizeStatus(item.status) === 'assigned');
+    const assigned = assignedItems.reduce((sum, item) => sum + this.getItemQuantity(item), 0);
+    
+    // Technicians: sum of assigned quantities (partial assignments from currentUserAssignment.quantity)
+    const userAssignedTotal = list.reduce((sum, item) => {
+      const assignedQty = item.currentUserAssignment?.quantity;
+      if (assignedQty && typeof assignedQty === 'number' && assignedQty > 0) {
+        return sum + assignedQty;
+      }
+      return sum;
+    }, 0);
+    
+    // In Stock: available quantity (total - assigned)
+    // For all items: calculate remaining unassigned quantity
+    const available = list.reduce((sum, item) => {
+      const itemQty = this.getItemQuantity(item);
+      const assignedQty = item.currentUserAssignment?.quantity;
+      
+      // If item has partial user assignment, calculate remaining quantity
+      if (assignedQty && typeof assignedQty === 'number' && assignedQty > 0) {
+        const remaining = itemQty - assignedQty;
+        return sum + Math.max(0, remaining);
+      }
+      
+      // If item is fully available (no user assignments), add full quantity
+      // Only count items that are actually available (not assigned to projects)
+      if (this.normalizeStatus(item.status) === 'available' && !item.currentAssignment) {
+        return sum + itemQty;
+      }
+      
+      return sum;
+    }, 0);
+    
+    const retiredItems = list.filter((item) => {
       const normalized = this.normalizeStatus(item.status);
       return normalized === 'retired' || normalized === 'inactive';
-    }).length;
+    });
+    const retired = retiredItems.reduce((sum, item) => sum + this.getItemQuantity(item), 0);
+    
     const alarmed = this.alarmedFilteredItemIds().size;
 
     return [
       {
         title: 'Inventory items',
         value: total.toString(),
-        helper: `${assigned} project • ${userAssigned} user`,
+        helper: `${assigned} project • ${userAssignedTotal} user`,
         tone: 'default',
       },
       {
@@ -468,9 +511,9 @@ export class InventoryOverviewComponent implements OnInit {
       },
       {
         title: 'Technicians',
-        value: userAssigned.toString(),
+        value: userAssignedTotal.toString(),
         helper: 'Stock with users',
-        tone: userAssigned > 0 ? 'default' : 'warning',
+        tone: userAssignedTotal > 0 ? 'default' : 'warning',
       },
       {
         title: 'In Stock',
@@ -569,7 +612,62 @@ export class InventoryOverviewComponent implements OnInit {
     return 'bg-slate-200 text-slate-700';
   }
 
-  statusLabel(status: string | undefined): string {
+  // Get effective quantity for an item (1 for serialized items, actual quantity for no-serial items)
+  getItemQuantity(item: InventoryItem): number {
+    if (item.quantity && typeof item.quantity === 'number' && item.quantity > 0) {
+      return item.quantity;
+    }
+    return 1; // Serialized items count as 1
+  }
+
+  // Get assigned quantity for display
+  getAssignedQuantity(item: InventoryItem): number | null {
+    return item.currentUserAssignment?.quantity ?? null;
+  }
+
+  // Check if an item is a no-serial device type
+  isNoSerialDeviceType(item: InventoryItem): boolean {
+    if (!item.device?.type) {
+      return false;
+    }
+    const deviceType = this.deviceTypes().find(
+      (type) => (type.name ?? '').trim().toLowerCase() === (item.device?.type ?? '').trim().toLowerCase(),
+    );
+    return deviceType?.noSerial ?? false;
+  }
+
+  // Get combined status display for no-serial devices (without quantities)
+  getNoSerialStatusDisplay(item: InventoryItem): string {
+    const parts: string[] = [];
+    
+    // In stock
+    const inStock = item.inStock ?? 0;
+    if (inStock > 0) {
+      parts.push('In stock');
+    }
+    
+    // Assigned to users
+    const assignedToUsers = item.userAssignments?.reduce((sum, a) => sum + (a.qty || 0), 0) ?? 0;
+    if (assignedToUsers > 0) {
+      parts.push('Assigned to user');
+    }
+    
+    // Assigned to projects
+    const assignedToProjects = item.projectAssignments?.reduce((sum, a) => sum + (a.qty || 0), 0) ?? 0;
+    if (assignedToProjects > 0) {
+      parts.push('Assigned to project');
+    }
+    
+    return parts.length > 0 ? parts.join(' • ') : 'No stock';
+  }
+
+  statusLabel(status: string | undefined, item?: InventoryItem): string {
+    // For no-serial devices, show combined status
+    if (item && this.isNoSerialDeviceType(item)) {
+      return this.getNoSerialStatusDisplay(item);
+    }
+    
+    // For serialized devices, use the old logic
     if (!status) {
       return 'Unknown';
     }
@@ -1165,7 +1263,7 @@ export class InventoryOverviewComponent implements OnInit {
     if (isNoSerial) {
       const quantity = Number(state.quantity);
       if (Number.isFinite(quantity) && quantity > 0) {
-        payload.quantity = quantity;
+        payload['quantity'] = quantity;
       }
     }
 
@@ -1258,8 +1356,22 @@ export class InventoryOverviewComponent implements OnInit {
 
   openUnassignUserModal(item: InventoryItem): void {
     this.unassignUserModalItem.set(item);
+    
+    // Initialize quantity for no-serial devices
+    let initialQuantity = '1';
+    if (this.isNoSerialDeviceType(item)) {
+      const currentUserId = this.currentUserId();
+      if (currentUserId && item.userAssignments) {
+        const userAssignment = item.userAssignments.find(ua => ua.userId === currentUserId);
+        if (userAssignment && (userAssignment.qty || 0) > 0) {
+          initialQuantity = String(userAssignment.qty);
+        }
+      }
+    }
+    
     this.unassignUserState.set({
       reason: '',
+      quantity: initialQuantity,
       error: null,
       isSaving: false,
     });
@@ -1291,14 +1403,48 @@ export class InventoryOverviewComponent implements OnInit {
       return;
     }
 
+    // For no-serial devices, validate quantity
+    const isNoSerial = this.isNoSerialDeviceType(item);
+    if (isNoSerial) {
+      const currentUserId = this.currentUserId();
+      if (currentUserId && item.userAssignments) {
+        const userAssignment = item.userAssignments.find(ua => ua.userId === currentUserId);
+        const assignedQty = userAssignment?.qty || 0;
+        const requestedQty = parseInt(state.quantity, 10) || 0;
+        
+        if (requestedQty <= 0) {
+          this.unassignUserState.update((current) => ({
+            ...current,
+            error: 'Quantity must be greater than 0.',
+          }));
+          return;
+        }
+        
+        if (requestedQty > assignedQty) {
+          this.unassignUserState.update((current) => ({
+            ...current,
+            error: `Cannot return more than assigned quantity (${assignedQty}).`,
+          }));
+          return;
+        }
+      }
+    }
+
     this.unassignUserState.update((current) => ({
       ...current,
       error: null,
       isSaving: true,
     }));
 
+    // For no-serial devices, pass userId and qty
+    const currentUserId = this.currentUserId();
+    const unassignOptions = isNoSerial && currentUserId ? {
+      userId: currentUserId,
+      qty: parseInt(state.quantity, 10) || 1
+    } : undefined;
+
     this.inventoryService
-      .unassignFromUser(item._id, state.reason.trim())
+      .unassignFromUser(item._id, state.reason.trim(), unassignOptions)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         catchError((error) => {
@@ -1318,6 +1464,13 @@ export class InventoryOverviewComponent implements OnInit {
         this.closeUnassignUserModal();
         this.loadInventory();
       });
+  }
+
+  onUnassignUserQuantityChange(value: string): void {
+    this.unassignUserState.update((state) => ({
+      ...state,
+      quantity: value,
+    }));
   }
 
   openCreateDeviceModal(item?: InventoryItem): void {
@@ -1481,7 +1634,7 @@ export class InventoryOverviewComponent implements OnInit {
 
     // Add quantity for no-serial devices
     if (isNoSerial) {
-      payload.quantity = Number(state.quantity);
+      payload['quantity'] = Number(state.quantity);
     }
     
     // Include country if provided
@@ -1855,11 +2008,72 @@ export class InventoryOverviewComponent implements OnInit {
   }
 
   canAssignToUser(item: InventoryItem): boolean {
+    // For no-serial devices: check if there's inStock available
+    if (this.isNoSerialDeviceType(item)) {
+      const inStock = item.inStock ?? 0;
+      return inStock > 0;
+    }
+    // For serialized devices: check if not assigned to user
     return !item.currentUserAssignment;
   }
 
   canUnassignFromUser(item: InventoryItem): boolean {
+    // For no-serial devices: check if user has assigned quantity
+    if (this.isNoSerialDeviceType(item)) {
+      const currentUserId = this.currentUserId();
+      if (!currentUserId) {
+        return false;
+      }
+      const userAssignment = item.userAssignments?.find(ua => ua.userId === currentUserId);
+      return (userAssignment?.qty || 0) > 0;
+    }
+    // For serialized devices: check if assigned to user
     return !!item.currentUserAssignment;
+  }
+
+  // Check if item has inStock available (for no-serial devices)
+  hasInStock(item: InventoryItem): boolean {
+    if (this.isNoSerialDeviceType(item)) {
+      return (item.inStock ?? 0) > 0;
+    }
+    return false;
+  }
+
+  // Check if item has user assignments (for no-serial devices)
+  hasUserAssignments(item: InventoryItem): boolean {
+    if (this.isNoSerialDeviceType(item)) {
+      const currentUserId = this.currentUserId();
+      if (!currentUserId) {
+        return false;
+      }
+      const userAssignment = item.userAssignments?.find(ua => ua.userId === currentUserId);
+      return (userAssignment?.qty || 0) > 0;
+    }
+    return false;
+  }
+
+  // Get maximum assignable quantity (inStock for no-serial devices)
+  getMaxAssignableQuantity(item: InventoryItem | null | undefined): number {
+    if (!item) {
+      return 0;
+    }
+    if (this.isNoSerialDeviceType(item)) {
+      return item.inStock ?? 0;
+    }
+    return item.quantity ?? 0;
+  }
+
+  // Get user assigned quantity (for no-serial devices return modal)
+  getUserAssignedQuantity(item: InventoryItem | null | undefined): number {
+    if (!item || !this.isNoSerialDeviceType(item)) {
+      return 0;
+    }
+    const currentUserId = this.currentUserId();
+    if (!currentUserId || !item.userAssignments) {
+      return 0;
+    }
+    const userAssignment = item.userAssignments.find(ua => ua.userId === currentUserId);
+    return userAssignment?.qty || 0;
   }
 
   isUnassigned(item: InventoryItem): boolean {

@@ -1147,7 +1147,7 @@
                           />
                           <div class="flex-1 space-y-1">
                             <p class="font-semibold text-slate-900">
-                              {{ inventoryShortLabel(item) }}
+                              {{ inventoryAddItemLabel(item) }}
                             </p>
                             <div class="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                               <span class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1">
@@ -1158,9 +1158,12 @@
                                   Model: {{ item.device?.model }}
                                 </span>
                               }
-                              <span class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1">
-                                Serial: {{ item.device?.serialNumber || item._id }}
-                              </span>
+                              @let assignedQty = getAssignedQuantityToCurrentUser(item);
+                              @if (assignedQty) {
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1">
+                                  Qty: {{ assignedQty }}
+                                </span>
+                              }
                             </div>
                           </div>
                         </label>
@@ -1302,7 +1305,7 @@
                           />
                           <div class="flex-1 space-y-1">
                             <p class="font-semibold text-slate-900">
-                              {{ inventoryShortLabel(item) }}
+                              {{ inventoryAddItemLabel(item) }}
                             </p>
                             <div class="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                               <span class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1">
@@ -1313,9 +1316,12 @@
                                   Model: {{ item.device?.model }}
                                 </span>
                               }
-                              <span class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1">
-                                Serial: {{ item.device?.serialNumber || item._id }}
-                              </span>
+                              @let assignedQty = getAssignedQuantityToCurrentUser(item);
+                              @if (assignedQty) {
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1">
+                                  Qty: {{ assignedQty }}
+                                </span>
+                              }
                             </div>
                           </div>
                         </label>

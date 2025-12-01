@@ -34,11 +34,13 @@ import { Camera } from '@core/models/camera.model';
 import { User } from '@core/models/user.model';
 import { AuthStore } from '@core/auth/auth.store';
 import { InventoryService } from '@core/services/inventory.service';
+import { DeviceTypeService } from '@core/services/device-type.service';
 import {
   InventoryAssignmentPayload,
   InventoryItem,
   InventoryUserAssignmentPayload,
 } from '@core/models/inventory.model';
+import { DeviceType } from '@core/models/device-type.model';
 import { environment } from '@env';
 
 interface MaintenanceMetricCard {
@@ -196,6 +198,7 @@ export class MaintenanceOverviewComponent implements OnInit {
   private readonly memoryService = inject(MemoryService);
   private readonly userService = inject(UserService);
   private readonly inventoryService = inject(InventoryService);
+  private readonly deviceTypeService = inject(DeviceTypeService);
   private readonly authStore = inject(AuthStore);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -285,6 +288,9 @@ export class MaintenanceOverviewComponent implements OnInit {
 
   // Camera health data for installation conditional logic
   readonly cameraHealthData = signal<{ cameraId: string; imageCount: number | null } | null>(null);
+
+  // Device types for checking no-serial flag
+  readonly deviceTypes = signal<DeviceType[]>([]);
 
   private readonly emptyReplaceState: ReplaceMaterialsState = {
     isLoading: false,
@@ -1070,26 +1076,88 @@ export class MaintenanceOverviewComponent implements OnInit {
       const addSet = new Set(addItemIds);
       if (wantsAddItems && addItemIds.length && task.developerId && task.projectId && task.cameraId) {
         const addNotes = `Installed during maintenance task ${task.id}`;
+        
+        // Load device types if not already loaded
+        let deviceTypesList = this.deviceTypes();
+        if (deviceTypesList.length === 0) {
+          deviceTypesList = await firstValueFrom(
+            this.deviceTypeService.getAll().pipe(catchError(() => of<DeviceType[]>([])))
+          );
+          this.deviceTypes.set(deviceTypesList);
+        }
+        
         for (const itemId of addItemIds) {
           const item = replacementMap.get(itemId);
           if (!item) {
             continue;
           }
 
-          if (item.currentUserAssignment?.userId) {
-            await firstValueFrom(this.inventoryService.unassignFromUser(itemId, addNotes));
-          }
-
-          await firstValueFrom(
-            this.inventoryService.assignToProject(itemId, {
-              developer: task.developerId,
-              project: task.projectId,
-              camera: task.cameraId,
-              notes: addNotes,
-            }),
+          // Check if this is a no-serial device type
+          const deviceTypeName = item.device?.type;
+          const deviceType = deviceTypesList.find(
+            (dt) => (dt.name ?? '').trim().toLowerCase() === (deviceTypeName ?? '').trim().toLowerCase()
           );
+          const isNoSerial = deviceType?.noSerial ?? false;
 
-          addSummaries.push(this.inventoryShortLabel(item));
+          if (isNoSerial) {
+            // For no-serial devices: reduce user assignment by 1 and add to project assignment
+            
+            // First, unassign 1 quantity from the current user
+            const currentUserId = this.currentUserId();
+            if (currentUserId && item.userAssignments) {
+              const userAssignment = item.userAssignments.find(ua => ua.userId === currentUserId);
+              if (userAssignment && (userAssignment.qty || 0) > 0) {
+                // Unassign 1 quantity from user
+                await firstValueFrom(
+                  this.inventoryService.unassignFromUser(itemId, addNotes, {
+                    userId: currentUserId,
+                    qty: 1
+                  })
+                );
+              }
+            }
+            
+            // Then assign 1 quantity to the project
+            await firstValueFrom(
+              this.inventoryService.assignToProject(itemId, {
+                developer: task.developerId,
+                project: task.projectId,
+                camera: task.cameraId,
+                notes: addNotes,
+                quantity: 1, // Add quantity 1 to project assignment
+              }),
+            );
+
+            // Check if item still has quantity assigned to user
+            const updatedItem = await firstValueFrom(this.inventoryService.getById(itemId));
+            const userStillHasQty = updatedItem.userAssignments?.some(
+              (ua: any) => ua.userId === currentUserId && (ua.qty || 0) > 0
+            );
+            
+            if (userStillHasQty) {
+              // User still has quantity, keep in replacement list
+              addSet.delete(itemId);
+            }
+            // If user no longer has quantity, item will be removed from list (stays in addSet)
+
+            addSummaries.push(this.inventoryAddItemLabel(item));
+          } else {
+            // For serialized devices: unassign from user first, then assign to project
+            if (item.currentUserAssignment?.userId) {
+              await firstValueFrom(this.inventoryService.unassignFromUser(itemId, addNotes));
+            }
+            
+            await firstValueFrom(
+              this.inventoryService.assignToProject(itemId, {
+                developer: task.developerId,
+                project: task.projectId,
+                camera: task.cameraId,
+                notes: addNotes,
+              }),
+            );
+
+            addSummaries.push(this.inventoryShortLabel(item));
+          }
         }
 
         if (addSummaries.length) {
@@ -1214,10 +1282,14 @@ export class MaintenanceOverviewComponent implements OnInit {
     forkJoin({
       assigned: this.inventoryService.getByCamera(task.cameraId, task.cameraName).pipe(catchError(() => of<InventoryItem[]>([]))),
       all: this.inventoryService.getAll().pipe(catchError(() => of<InventoryItem[]>([]))),
+      deviceTypes: this.deviceTypeService.getAll().pipe(catchError(() => of<DeviceType[]>([]))),
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: ({ assigned, all }) => {
+        next: ({ assigned, all, deviceTypes }) => {
+          // Load device types for checking no-serial flag
+          this.deviceTypes.set(deviceTypes);
+          
           const entries: ReplaceMaterialsEntry[] = assigned.map((item) => ({
             item,
             selected: false,
@@ -2143,6 +2215,27 @@ export class MaintenanceOverviewComponent implements OnInit {
     return `${type}${model ? ` ${model}` : ''} • ${serial}`;
   }
 
+  inventoryAddItemLabel(item: InventoryItem): string {
+    const type = this.inventoryDeviceType(item);
+    const model = this.inventoryDeviceModel(item);
+    return `${type}${model ? ` ${model}` : ''}`;
+  }
+
+  getAssignedQuantityToCurrentUser(item: InventoryItem): number | null {
+    const currentUserId = this.currentUserId();
+    if (!currentUserId) {
+      return null;
+    }
+    
+    // Check if item is assigned to current user
+    if (item.currentUserAssignment?.userId === currentUserId) {
+      // Return the assigned quantity, or 1 if not specified (for serialized items)
+      return item.currentUserAssignment?.quantity ?? 1;
+    }
+    
+    return null;
+  }
+
   private isInventoryUnassigned(item: InventoryItem): boolean {
     const status = this.normalizeInventoryStatus(item.status);
     if (status === 'assigned') {
@@ -2193,7 +2286,27 @@ export class MaintenanceOverviewComponent implements OnInit {
     if (!currentUserId) {
       return false;
     }
-    return (item.currentUserAssignment?.userId ?? null) === currentUserId;
+    
+    // Check if this is a no-serial device type
+    const deviceTypes = this.deviceTypes();
+    const deviceTypeName = item.device?.type;
+    const deviceType = deviceTypes.find(
+      (dt) => (dt.name ?? '').trim().toLowerCase() === (deviceTypeName ?? '').trim().toLowerCase()
+    );
+    const isNoSerial = deviceType?.noSerial ?? false;
+    
+    if (isNoSerial) {
+      // For no-serial devices: check userAssignments array
+      if (item.userAssignments && Array.isArray(item.userAssignments)) {
+        return item.userAssignments.some(
+          (assignment) => assignment.userId === currentUserId && (assignment.qty || 0) > 0
+        );
+      }
+      return false;
+    } else {
+      // For serialized devices: check currentUserAssignment (backward compatibility)
+      return (item.currentUserAssignment?.userId ?? null) === currentUserId;
+    }
   }
 
   private setCompletionActions(

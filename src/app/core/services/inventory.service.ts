@@ -101,8 +101,14 @@ export class InventoryService {
     return this.http.patch<InventoryItem>(`${this.baseUrl}/unassign/${itemId}`, payload);
   }
 
-  unassignFromUser(itemId: string, reason: string): Observable<InventoryItem> {
-    const payload: InventoryUnassignRequest = { reason };
+  unassignFromUser(itemId: string, reason: string, options?: { userId?: string; qty?: number }): Observable<InventoryItem> {
+    const payload: InventoryUnassignRequest & { userId?: string; qty?: number } = { reason };
+    if (options?.userId) {
+      payload.userId = options.userId;
+    }
+    if (options?.qty !== undefined) {
+      payload.qty = options.qty;
+    }
     return this.http.patch<InventoryItem>(`${this.baseUrl}/unassign-user/${itemId}`, payload);
   }
 

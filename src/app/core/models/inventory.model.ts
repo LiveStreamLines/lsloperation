@@ -33,8 +33,27 @@ export interface InventoryItem {
   status: string;
   validityDays?: number;
   isActive?: boolean;
-  quantity?: number;
+  quantity?: number; // Total quantity (for no-serial devices)
+  inStock?: number; // Available quantity in stock (for no-serial devices)
   createdDate?: string;
+  // New structure for no-serial devices
+  userAssignments?: Array<{
+    userId: string;
+    userName: string;
+    qty: number;
+    assignedDate?: string;
+    [key: string]: unknown;
+  }>;
+  projectAssignments?: Array<{
+    developer: string;
+    project: string;
+    camera: string;
+    qty: number;
+    notes?: string;
+    assignedDate?: string;
+    [key: string]: unknown;
+  }>;
+  // Legacy structure for serialized devices (backward compatibility)
   assignmentHistory?: InventoryAssignment[];
   currentAssignment?: InventoryAssignment | null;
   userAssignmentHistory?: InventoryUserAssignment[];

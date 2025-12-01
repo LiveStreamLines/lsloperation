@@ -317,6 +317,7 @@
               <th class="px-5 py-3">Last movement</th>
               <th class="px-5 py-3">Age</th>
               <th class="px-5 py-3">Validity left</th>
+              <th class="px-5 py-3">Quantity</th>
               <th class="px-5 py-3">Status</th>
               <th class="px-5 py-3 text-right">Actions</th>
             </tr>
@@ -392,37 +393,52 @@
                   }
                 </td>
                 <td class="px-5 py-4">
+                  @if (item.quantity) {
+                    @let assignedQty = getAssignedQuantity(item);
+                    <div class="flex flex-col gap-1">
+                      <span class="text-sm font-semibold text-slate-900">{{ item.quantity }}</span>
+                      @if (selectedStatus() === 'user_assigned' && assignedQty) {
+                        <span class="text-xs text-slate-500">Assigned: {{ assignedQty }}</span>
+                      }
+                    </div>
+                  } @else {
+                    <span class="text-sm text-slate-400">—</span>
+                  }
+                </td>
+                <td class="px-5 py-4">
                   <span
                     class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
                     [ngClass]="statusColor(item.status)"
                   >
-                    {{ statusLabel(item.status) }}
+                    {{ statusLabel(item.status, item) }}
                   </span>
                 </td>
                 <td class="px-5 py-4">
                   <div class="flex flex-wrap justify-end gap-2">
                     <!-- Action buttons based on device status and permissions -->
-                    @if (item.status === 'available' && canAssignToUserPermission()) {
-                      <!-- In Stock: Show Assign to user button -->
-                      <button
-                        type="button"
-                        class="rounded-2xl border border-sky-200 px-3 py-1 text-xs font-semibold text-sky-600 transition hover:bg-sky-50 disabled:opacity-60"
-                        (click)="openAssignUserModal(item)"
-                        [disabled]="!canAssignToUser(item)"
-                      >
-                        Assign to user
-                      </button>
-                    }
-                    @if (item.status === 'user_assigned' && canAssignToUserPermission()) {
-                      <!-- With User: Show Return button -->
-                      <button
-                        type="button"
-                        class="rounded-2xl border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-600 transition hover:bg-amber-50 disabled:opacity-60"
-                        (click)="openUnassignUserModal(item)"
-                        [disabled]="!canUnassignFromUser(item)"
-                      >
-                        Return
-                      </button>
+                    @if (canAssignToUserPermission()) {
+                      @if (hasInStock(item) || (item.status === 'available' && !isNoSerialDeviceType(item))) {
+                        <!-- Show Assign to user button if inStock > 0 (no-serial) or status is available (serialized) -->
+                        <button
+                          type="button"
+                          class="rounded-2xl border border-sky-200 px-3 py-1 text-xs font-semibold text-sky-600 transition hover:bg-sky-50 disabled:opacity-60"
+                          (click)="openAssignUserModal(item)"
+                          [disabled]="!canAssignToUser(item)"
+                        >
+                          Assign to user
+                        </button>
+                      }
+                      @if (hasUserAssignments(item) || (item.status === 'user_assigned' && !isNoSerialDeviceType(item))) {
+                        <!-- Show Return button if user has assigned quantity (no-serial) or status is user_assigned (serialized) -->
+                        <button
+                          type="button"
+                          class="rounded-2xl border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-600 transition hover:bg-amber-50 disabled:opacity-60"
+                          (click)="openUnassignUserModal(item)"
+                          [disabled]="!canUnassignFromUser(item)"
+                        >
+                          Return
+                        </button>
+                      }
                     }
                     <!-- On Project: No action buttons (status === 'assigned') -->
 
@@ -953,13 +969,14 @@
               <input
                 type="number"
                 min="1"
+                [max]="getMaxAssignableQuantity(assignUserModalItem())"
                 step="1"
                 class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="Enter quantity to assign"
                 [value]="assignUserState().quantity"
                 (input)="onAssignUserQuantityChange($any($event.target).value)"
               />
-              <span class="text-xs text-slate-500">Maximum available: {{ assignUserModalItem()?.quantity ?? 0 }}</span>
+              <span class="text-xs text-slate-500">Maximum available: {{ getMaxAssignableQuantity(assignUserModalItem()) }}</span>
             </label>
           }
 
@@ -1092,6 +1109,23 @@
           <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {{ unassignUserState().error }}
           </div>
+        }
+
+        @if (isNoSerialDeviceType(unassignUserModalItem()!)) {
+          <label class="flex flex-col gap-2 text-sm text-slate-600">
+            <span class="font-semibold text-slate-800">Quantity</span>
+            <input
+              type="number"
+              min="1"
+              [max]="getUserAssignedQuantity(unassignUserModalItem()!)"
+              step="1"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Enter quantity to return"
+              [value]="unassignUserState().quantity"
+              (input)="onUnassignUserQuantityChange($any($event.target).value)"
+            />
+            <span class="text-xs text-slate-500">Maximum returnable: {{ getUserAssignedQuantity(unassignUserModalItem()!) }}</span>
+          </label>
         }
 
         <label class="flex flex-col gap-2 text-sm text-slate-600">
