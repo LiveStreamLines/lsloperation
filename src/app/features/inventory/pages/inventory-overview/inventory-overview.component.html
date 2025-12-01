@@ -535,6 +535,19 @@
             ></textarea>
             <span class="text-xs text-slate-400">Separate models with commas or dashes.</span>
           </label>
+
+          <label class="flex items-center gap-3">
+            <input
+              type="checkbox"
+              class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+              [checked]="deviceTypeForm().noSerial"
+              (change)="onDeviceTypeNoSerialChange($any($event.target).checked)"
+            />
+            <div class="flex flex-col gap-1">
+              <span class="text-sm font-semibold text-slate-800">No Serial Number</span>
+              <span class="text-xs text-slate-500">Check this if devices of this type don't have serial numbers and should be tracked by quantity instead.</span>
+            </div>
+          </label>
         </div>
 
         <div>
@@ -783,16 +796,31 @@
             </select>
           </label>
 
-          <label class="flex flex-col gap-2 text-sm text-slate-600">
-            <span class="font-semibold text-slate-800">Serial number</span>
-            <input
-              type="text"
-              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Enter serial number"
-              [value]="createDeviceState().serialNumber"
-              (input)="onCreateDeviceSerialChange($any($event.target).value)"
-            />
-          </label>
+          @if (isSelectedDeviceTypeNoSerial()) {
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+              <span class="font-semibold text-slate-800">Quantity</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Enter quantity"
+                [value]="createDeviceState().quantity"
+                (input)="onCreateDeviceQuantityChange($any($event.target).value)"
+              />
+            </label>
+          } @else {
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+              <span class="font-semibold text-slate-800">Serial number</span>
+              <input
+                type="text"
+                class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Enter serial number"
+                [value]="createDeviceState().serialNumber"
+                (input)="onCreateDeviceSerialChange($any($event.target).value)"
+              />
+            </label>
+          }
 
           <label class="flex flex-col gap-2 text-sm text-slate-600">
             <span class="font-semibold text-slate-800">Model <span class="text-xs text-slate-400" *ngIf="typeModelOptions().length === 0">(optional)</span></span>
@@ -918,6 +946,22 @@
               }
             </select>
           </label>
+
+          @if (isAssignUserItemNoSerial()) {
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+              <span class="font-semibold text-slate-800">Quantity</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Enter quantity to assign"
+                [value]="assignUserState().quantity"
+                (input)="onAssignUserQuantityChange($any($event.target).value)"
+              />
+              <span class="text-xs text-slate-500">Maximum available: {{ assignUserModalItem()?.quantity ?? 0 }}</span>
+            </label>
+          }
 
           <label class="flex flex-col gap-2 text-sm text-slate-600">
             <span class="font-semibold text-slate-800">Notes <span class="text-xs text-slate-400">(optional)</span></span>

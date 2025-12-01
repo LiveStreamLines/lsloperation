@@ -1,6 +1,6 @@
 export interface InventoryDevice {
   type: string;
-  serialNumber: string;
+  serialNumber?: string;
   model?: string;
   [key: string]: unknown;
 }
@@ -20,6 +20,7 @@ export interface InventoryUserAssignment {
   userId?: string;
   userName?: string;
   notes?: string;
+  quantity?: number;
   assignedDate?: string;
   removedDate?: string;
   removalReason?: string;
@@ -32,6 +33,7 @@ export interface InventoryItem {
   status: string;
   validityDays?: number;
   isActive?: boolean;
+  quantity?: number;
   createdDate?: string;
   assignmentHistory?: InventoryAssignment[];
   currentAssignment?: InventoryAssignment | null;

@@ -4,6 +4,7 @@ export interface DeviceType {
   validityDays: number;
   isActive?: boolean;
   models?: string[];
+  noSerial?: boolean;
   createdDate?: string;
   [key: string]: unknown;
 }

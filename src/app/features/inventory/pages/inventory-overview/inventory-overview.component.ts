@@ -256,6 +256,18 @@ export class InventoryOverviewComponent implements OnInit {
     }
     return map;
   });
+  readonly isSelectedDeviceTypeNoSerial = computed(() => {
+    const selectedType = this.createDeviceState().type;
+    if (!selectedType) {
+      return false;
+    }
+    const normalized = selectedType.trim().toLowerCase();
+    const deviceTypeDefinition = this.deviceTypes().find(
+      (definition) => (definition.name ?? '').trim().toLowerCase() === normalized,
+    );
+    return deviceTypeDefinition?.noSerial ?? false;
+  });
+
   readonly deviceModelOptions = computed(() => {
     const type = this.selectedDeviceType();
     if (!type) {
@@ -300,10 +312,11 @@ export class InventoryOverviewComponent implements OnInit {
   readonly isDeviceTypeModalOpen = signal(false);
   readonly isSavingDeviceType = signal(false);
   readonly deviceTypeError = signal<string | null>(null);
-  readonly deviceTypeForm = signal<{ name: string; validityDays: number | string; suggestedModels: string }>({
+  readonly deviceTypeForm = signal<{ name: string; validityDays: number | string; suggestedModels: string; noSerial: boolean }>({
     name: '',
     validityDays: 365,
     suggestedModels: '',
+    noSerial: false,
   });
 
   readonly assignProjectModalItem = signal<InventoryItem | null>(null);
@@ -327,13 +340,26 @@ export class InventoryOverviewComponent implements OnInit {
   readonly assignUserState = signal<{
     adminId: string;
     notes: string;
+    quantity: string;
     error: string | null;
     isSaving: boolean;
   }>({
     adminId: '',
     notes: '',
+    quantity: '1',
     error: null,
     isSaving: false,
+  });
+
+  readonly isAssignUserItemNoSerial = computed(() => {
+    const item = this.assignUserModalItem();
+    if (!item || !item.device?.type) {
+      return false;
+    }
+    const deviceType = this.deviceTypes().find(
+      (type) => (type.name ?? '').trim().toLowerCase() === (item.device?.type ?? '').trim().toLowerCase(),
+    );
+    return deviceType?.noSerial ?? false;
   });
 
   readonly unassignProjectModalItem = signal<InventoryItem | null>(null);
@@ -376,6 +402,7 @@ export class InventoryOverviewComponent implements OnInit {
     itemId: string | null;
     type: string;
     serialNumber: string;
+    quantity: string;
     model: string;
     estimatedAge: string;
     country: string;
@@ -385,6 +412,7 @@ export class InventoryOverviewComponent implements OnInit {
     itemId: null,
     type: '',
     serialNumber: '',
+    quantity: '1',
     model: '',
     estimatedAge: '',
     country: '',
@@ -717,6 +745,7 @@ export class InventoryOverviewComponent implements OnInit {
       name: '',
       validityDays: 365,
       suggestedModels: '',
+      noSerial: false,
     });
     this.editingDeviceTypeId.set(null);
     this.deletingDeviceTypeId.set(null);
@@ -732,6 +761,7 @@ export class InventoryOverviewComponent implements OnInit {
       name: '',
       validityDays: 365,
       suggestedModels: '',
+      noSerial: false,
     });
   }
 
@@ -756,6 +786,13 @@ export class InventoryOverviewComponent implements OnInit {
     }));
   }
 
+  onDeviceTypeNoSerialChange(value: boolean): void {
+    this.deviceTypeForm.update((current) => ({
+      ...current,
+      noSerial: value,
+    }));
+  }
+
   saveDeviceType(): void {
     const form = this.deviceTypeForm();
     const name = (form.name || '').trim();
@@ -765,6 +802,7 @@ export class InventoryOverviewComponent implements OnInit {
       .split(/\s*[\n,;]\s*|\s+-\s+/)
       .map((model) => model.trim())
       .filter((model) => model.length > 0);
+    const noSerial = form.noSerial ?? false;
 
     if (!name) {
       this.deviceTypeError.set('Please provide a device type name.');
@@ -787,6 +825,7 @@ export class InventoryOverviewComponent implements OnInit {
           name,
           validityDays,
           models,
+          noSerial,
         })
         .pipe(
           takeUntilDestroyed(this.destroyRef),
@@ -809,6 +848,7 @@ export class InventoryOverviewComponent implements OnInit {
             name: '',
             validityDays: 365,
             suggestedModels: '',
+            noSerial: false,
           });
           this.loadDeviceTypes();
           this.closeDeviceTypeModal();
@@ -821,6 +861,7 @@ export class InventoryOverviewComponent implements OnInit {
         name,
         validityDays,
         models,
+        noSerial,
       })
       .pipe(
         takeUntilDestroyed(this.destroyRef),
@@ -839,6 +880,7 @@ export class InventoryOverviewComponent implements OnInit {
           name: '',
           validityDays: 365,
           suggestedModels: '',
+          noSerial: false,
         });
         this.deviceTypes.update((current) => [...current, created]);
         this.loadDeviceTypes();
@@ -856,6 +898,7 @@ export class InventoryOverviewComponent implements OnInit {
       name: type.name ?? '',
       validityDays: type.validityDays ?? 365,
       suggestedModels: Array.isArray(type.models) ? type.models.join(', ') : '',
+      noSerial: type.noSerial ?? false,
     });
   }
 
@@ -866,6 +909,7 @@ export class InventoryOverviewComponent implements OnInit {
       name: '',
       validityDays: 365,
       suggestedModels: '',
+      noSerial: false,
     });
   }
 
@@ -1052,9 +1096,14 @@ export class InventoryOverviewComponent implements OnInit {
   openAssignUserModal(item: InventoryItem): void {
     const current = item.currentUserAssignment;
     this.assignUserModalItem.set(item);
+    const deviceType = this.deviceTypes().find(
+      (type) => (type.name ?? '').trim().toLowerCase() === (item.device?.type ?? '').trim().toLowerCase(),
+    );
+    const isNoSerial = deviceType?.noSerial ?? false;
     this.assignUserState.set({
       adminId: current?.userId ?? '',
       notes: current?.notes ?? '',
+      quantity: isNoSerial ? String(current?.quantity ?? item.quantity ?? '1') : '1',
       error: null,
       isSaving: false,
     });
@@ -1075,6 +1124,13 @@ export class InventoryOverviewComponent implements OnInit {
     this.assignUserState.update((state) => ({
       ...state,
       notes: value,
+    }));
+  }
+
+  onAssignUserQuantityChange(value: string): void {
+    this.assignUserState.update((state) => ({
+      ...state,
+      quantity: value,
     }));
   }
 
@@ -1100,11 +1156,18 @@ export class InventoryOverviewComponent implements OnInit {
     }));
 
     const admin = this.adminMap().get(state.adminId);
+    const isNoSerial = this.isAssignUserItemNoSerial();
     const payload: InventoryUserAssignmentPayload = {
       userId: state.adminId,
       userName: admin?.name ?? '',
       notes: state.notes.trim() ? state.notes.trim() : undefined,
     };
+    if (isNoSerial) {
+      const quantity = Number(state.quantity);
+      if (Number.isFinite(quantity) && quantity > 0) {
+        payload.quantity = quantity;
+      }
+    }
 
     this.inventoryService
       .assignToUser(item._id, payload)
@@ -1268,6 +1331,7 @@ export class InventoryOverviewComponent implements OnInit {
         itemId: item._id,
         type: item.device?.type || '',
         serialNumber: item.device?.serialNumber || '',
+        quantity: String(item.quantity ?? '1'),
         model: item.device?.model || '',
         estimatedAge: estimatedAgeString,
         country: (item as any).country || '',
@@ -1281,6 +1345,7 @@ export class InventoryOverviewComponent implements OnInit {
         itemId: null,
         type: this.deviceTypes()[0]?.name ?? '',
         serialNumber: '',
+        quantity: '1',
         model: '',
         estimatedAge: '',
         country: userCountry,
@@ -1323,6 +1388,13 @@ export class InventoryOverviewComponent implements OnInit {
     }));
   }
 
+  onCreateDeviceQuantityChange(value: string): void {
+    this.createDeviceState.update((state) => ({
+      ...state,
+      quantity: value,
+    }));
+  }
+
   onCreateDeviceModelChange(value: string): void {
     this.createDeviceState.update((state) => ({
       ...state,
@@ -1361,12 +1433,28 @@ export class InventoryOverviewComponent implements OnInit {
       return;
     }
 
-    if (!state.serialNumber.trim()) {
-      this.createDeviceState.update((current) => ({
-        ...current,
-        error: 'Serial number is required.',
-      }));
-      return;
+    // Check if device type is no-serial
+    const isNoSerial = this.isSelectedDeviceTypeNoSerial();
+
+    if (isNoSerial) {
+      // Validate quantity for no-serial devices
+      const quantity = Number(state.quantity);
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        this.createDeviceState.update((current) => ({
+          ...current,
+          error: 'Quantity must be a positive number.',
+        }));
+        return;
+      }
+    } else {
+      // Validate serial number for regular devices
+      if (!state.serialNumber.trim()) {
+        this.createDeviceState.update((current) => ({
+          ...current,
+          error: 'Serial number is required.',
+        }));
+        return;
+      }
     }
 
     this.createDeviceState.update((current) => ({
@@ -1382,10 +1470,19 @@ export class InventoryOverviewComponent implements OnInit {
     const payload: Partial<InventoryItem> = {
       device: {
         type: state.type.trim(),
-        serialNumber: state.serialNumber.trim(),
         model: state.model.trim() ? state.model.trim() : undefined,
       },
     };
+
+    // Add serialNumber only if not no-serial
+    if (!isNoSerial) {
+      payload.device!.serialNumber = state.serialNumber.trim();
+    }
+
+    // Add quantity for no-serial devices
+    if (isNoSerial) {
+      payload.quantity = Number(state.quantity);
+    }
     
     // Include country if provided
     if (state.country.trim()) {
