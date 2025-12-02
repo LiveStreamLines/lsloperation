@@ -200,25 +200,42 @@ export class ProjectsOverviewComponent implements OnInit {
 
   openEditProjectModal(project: Project): void {
     this.isAddMode.set(false);
-    this.editProjectModal.set(project);
-    // Ensure developers are loaded before populating form
-    if (this.developers().length === 0) {
-      this.developerService
-        .getAll({ forceRefresh: true })
-        .pipe(
-          takeUntilDestroyed(this.destroyRef),
-          catchError((error) => {
-            console.error('Failed to load developers', error);
-            return of<Developer[]>([]);
-          }),
-        )
-        .subscribe((developers) => {
-          this.developers.set(developers ?? []);
-          this.populateForm(project);
-        });
-    } else {
-      this.populateForm(project);
-    }
+    // Fetch fresh project data from server to ensure we have the latest
+    // Clear cache first, then get fresh data
+    this.projectService.clearCache();
+    this.projectService
+      .getAll(true) // Force refresh
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        map((projects) => projects.find((p) => p._id === project._id) || project),
+        catchError((error) => {
+          console.error('Failed to load project', error);
+          // Fallback to the project from the list if fetch fails
+          return of(project);
+        }),
+      )
+      .subscribe((freshProject) => {
+        const projectToUse = freshProject || project;
+        this.editProjectModal.set(projectToUse);
+        // Ensure developers are loaded before populating form
+        if (this.developers().length === 0) {
+          this.developerService
+            .getAll({ forceRefresh: true })
+            .pipe(
+              takeUntilDestroyed(this.destroyRef),
+              catchError((error) => {
+                console.error('Failed to load developers', error);
+                return of<Developer[]>([]);
+              }),
+            )
+            .subscribe((developers) => {
+              this.developers.set(developers ?? []);
+              this.populateForm(projectToUse);
+            });
+        } else {
+          this.populateForm(projectToUse);
+        }
+      });
   }
 
   closeProjectModal(): void {
@@ -298,6 +315,10 @@ export class ProjectsOverviewComponent implements OnInit {
       )
       .subscribe((updatedProject) => {
         if (updatedProject) {
+          // Update the projects list immediately
+          this.projects.update((projects) =>
+            projects.map((p) => (p._id === updatedProject._id ? updatedProject : p))
+          );
           this.projectForm.update((state) => ({
             ...state,
             existingInternalAttachments: updatedProject.internalAttachments ?? [],
@@ -402,6 +423,10 @@ export class ProjectsOverviewComponent implements OnInit {
       )
       .subscribe((saved) => {
         if (saved) {
+          // Update the projects list immediately with the saved project
+          this.projects.update((projects) =>
+            projects.map((p) => (p._id === saved._id ? saved : p))
+          );
           // Clear cache to ensure fresh data on reload
           this.projectService.clearCache();
           this.closeProjectModal();
@@ -430,8 +455,9 @@ export class ProjectsOverviewComponent implements OnInit {
       )
       .subscribe((updated) => {
         if (updated) {
+          // Update the projects list immediately with the updated project
           this.projects.update((projects) =>
-            projects.map((p) => (p._id === updated._id ? { ...p, status: updated.status } : p)),
+            projects.map((p) => (p._id === updated._id ? updated : p))
           );
         }
       });
