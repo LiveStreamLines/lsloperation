@@ -74,8 +74,9 @@ export class ProjectService {
     return this.http.post<ProjectAttachment>(`${this.baseUrl}/${projectId}/attachments`, formData);
   }
 
-  deleteAttachment(projectId: string, attachmentId: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/${projectId}/attachments/${attachmentId}`);
+  deleteAttachment(projectId: string, attachmentId: string): Observable<Project> {
+    this.clearCache();
+    return this.http.delete<Project>(`${this.baseUrl}/${projectId}/attachments/${attachmentId}`);
   }
 
   deleteInternalAttachment(projectId: string, attachmentId: string): Observable<Project> {

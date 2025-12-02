@@ -277,6 +277,14 @@ export class CameraService {
     return this.http.get<{ cycleStartDate: string | null }>(`${this.baseUrl}/maintenance-cycle/start-date`);
   }
 
+  deleteAttachment(cameraId: string, attachmentId: string): Observable<Camera> {
+    return this.http.delete<Camera>(`${this.baseUrl}/${cameraId}/attachments/${attachmentId}`).pipe(
+      tap(() => {
+        this.clearCache();
+      }),
+    );
+  }
+
   deleteInternalAttachment(cameraId: string, attachmentId: string): Observable<Camera> {
     return this.http.delete<Camera>(`${this.baseUrl}/${cameraId}/internal-attachments/${attachmentId}`).pipe(
       tap(() => {
