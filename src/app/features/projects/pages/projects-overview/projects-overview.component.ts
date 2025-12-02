@@ -371,14 +371,23 @@ export class ProjectsOverviewComponent implements OnInit {
             ),
           );
           return forkJoin(uploadRequests).pipe(
-            switchMap(() => {
-              const refreshed = this.projectService.getById(saved._id);
-              return refreshed.pipe(
-                map((proj) => proj || saved),
-                catchError(() => of(saved)),
-              );
+            map((results) => {
+              // Use the last successful upload result (which contains updated project with all attachments)
+              // Each upload returns the updated project, so the last one has all attachments
+              const lastResult = results[results.length - 1] || saved;
+              // Update the form state with the latest attachments and clear the upload queue
+              if (lastResult && lastResult.internalAttachments) {
+                this.projectForm.update((state) => ({
+                  ...state,
+                  existingInternalAttachments: lastResult.internalAttachments ?? [],
+                  internalAttachments: [], // Clear uploaded files
+                  isSaving: false,
+                }));
+                this.editProjectModal.set(lastResult);
+              }
+              return lastResult;
             }),
-            catchError(() => of(saved)), // Return saved project even if refresh fails
+            catchError(() => of(saved)), // Return saved project even if upload fails
           );
         }),
         catchError((error) => {
@@ -393,9 +402,12 @@ export class ProjectsOverviewComponent implements OnInit {
       )
       .subscribe((saved) => {
         if (saved) {
+          // Clear cache to ensure fresh data on reload
+          this.projectService.clearCache();
           this.closeProjectModal();
           const developerId = this.selectedDeveloperId();
           if (developerId) {
+            // Force refresh by clearing cache and reloading
             this.loadProjects(developerId);
           }
         }
