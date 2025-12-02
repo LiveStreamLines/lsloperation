@@ -101,6 +101,50 @@
               />
             </label>
 
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+              <span class="font-semibold text-slate-800">
+                Password 
+                @if (!isEditMode()) {
+                  <span class="text-rose-500">*</span>
+                }
+              </span>
+              <div class="relative">
+                <input
+                  [type]="showPassword() ? 'text' : 'password'"
+                  class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 pr-12 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  [ngModel]="userForm().password"
+                  (ngModelChange)="updateFormField('password', $event)"
+                  [ngModelOptions]="{standalone: true}"
+                  [placeholder]="isEditMode() ? 'Leave blank to keep current password' : 'Enter password (min. 8 characters)'"
+                  [required]="!isEditMode()"
+                />
+                <button
+                  type="button"
+                  (click)="togglePasswordVisibility()"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  aria-label="Toggle password visibility"
+                >
+                  @if (showPassword()) {
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.29 3.29m13.532 13.532l-3.29-3.29M3 3l18 18" />
+                    </svg>
+                  } @else {
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  }
+                </button>
+              </div>
+              <p class="text-xs text-slate-500">
+                @if (isEditMode()) {
+                  Leave blank to keep current password, or enter a new password (min. 8 characters).
+                } @else {
+                  Password must be at least 8 characters long.
+                }
+              </p>
+            </label>
+
             <div class="flex flex-col gap-3 md:col-span-3">
               <span class="font-semibold text-slate-800">Profile Image</span>
               <div class="flex flex-col gap-4 md:flex-row md:items-center">

@@ -21,6 +21,7 @@ interface UserFormState {
   name: string;
   email: string;
   phone: string;
+  password: string;
   role: string;
   country: 'UAE' | 'Saudi Arabia' | 'All' | '';
   image: string | null; // Persisted image path
@@ -109,6 +110,7 @@ export class UserFormComponent implements OnInit {
   readonly resetEmail = signal('');
   readonly userForm = signal<UserFormState>(this.createEmptyForm());
   readonly assetBaseUrl = environment.apiUrl.replace('/api', '');
+  readonly showPassword = signal(false);
 
   readonly developers = signal<Developer[]>([]);
   readonly projects = signal<Project[]>([]);
@@ -680,6 +682,7 @@ export class UserFormComponent implements OnInit {
       name: '',
       email: '',
       phone: '',
+      password: '',
       role: 'Admin',
       country: defaultCountry,
       image: null,
@@ -720,6 +723,7 @@ export class UserFormComponent implements OnInit {
       name: user.name || '',
       email: user.email || '',
       phone: user.phone || '',
+      password: '', // Don't populate password when editing
       role: (user.role as string) || 'User',
       country: (user.country as 'UAE' | 'Saudi Arabia' | 'All') || '',
       image: (user.logo || user.image) || null, // Backend uses 'logo', support both for compatibility
@@ -784,6 +788,24 @@ export class UserFormComponent implements OnInit {
       this.userForm.update((f) => ({
         ...f,
         error: 'Please fill in all required fields.',
+      }));
+      return;
+    }
+
+    // Password validation
+    if (!this.isEditMode() && !form.password) {
+      this.userForm.update((f) => ({
+        ...f,
+        error: 'Password is required for new users.',
+      }));
+      return;
+    }
+
+    // Validate password length if provided (for both create and edit)
+    if (form.password && form.password.length < 8) {
+      this.userForm.update((f) => ({
+        ...f,
+        error: 'Password must be at least 8 characters long.',
       }));
       return;
     }
@@ -945,6 +967,11 @@ export class UserFormComponent implements OnInit {
     formData.append('email', form.email.trim());
     formData.append('phone', form.phone?.trim() || '');
     formData.append('role', form.role || 'User');
+    
+    // Include password if provided (for both create and edit)
+    if (form.password && form.password.trim().length > 0) {
+      formData.append('password', form.password);
+    }
     if (form.country) {
       formData.append('country', form.country);
     }
@@ -1188,6 +1215,10 @@ export class UserFormComponent implements OnInit {
     const current = this.userForm().accessibleServices;
     const newSelection = current.filter((v) => v !== value);
     this.onServiceChange({ target: { selectedOptions: newSelection.map(v => ({ value: v })) } } as any);
+  }
+
+  togglePasswordVisibility(): void {
+    this.showPassword.update((value) => !value);
   }
 
   getDeveloperLabel(id: string): string {
