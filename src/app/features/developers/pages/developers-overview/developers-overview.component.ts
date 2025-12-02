@@ -2,8 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { of } from 'rxjs';
-import { catchError, finalize } from 'rxjs/operators';
+import { of, forkJoin } from 'rxjs';
+import { catchError, finalize, switchMap, map } from 'rxjs/operators';
 import { DeveloperService } from '@core/services/developer.service';
 import { Developer, DeveloperInternalAttachment } from '@core/models/developer.model';
 import { environment } from '@env';
@@ -276,6 +276,7 @@ export class DevelopersOverviewComponent implements OnInit {
       return;
     }
 
+    const attachmentsToUpload = [...form.internalAttachments];
     const formData = this.buildFormData(form);
     const developer = this.editDeveloperModal();
 
@@ -288,6 +289,30 @@ export class DevelopersOverviewComponent implements OnInit {
     request
       .pipe(
         takeUntilDestroyed(this.destroyRef),
+        switchMap((saved) => {
+          if (!saved || attachmentsToUpload.length === 0) {
+            return of(saved);
+          }
+          // Upload attachments to S3 separately
+          const uploadRequests = attachmentsToUpload.map((file) =>
+            this.developerService.uploadInternalAttachment(saved._id, file).pipe(
+              catchError((error) => {
+                console.error('Failed to upload attachment', file.name, error);
+                return of(saved); // Continue even if one attachment fails
+              }),
+            ),
+          );
+          return forkJoin(uploadRequests).pipe(
+            switchMap(() => {
+              const refreshed = this.developerService.getById(saved._id);
+              return refreshed.pipe(
+                map((dev) => dev || saved),
+                catchError(() => of(saved)),
+              );
+            }),
+            catchError(() => of(saved)), // Return saved developer even if refresh fails
+          );
+        }),
         catchError((error) => {
           console.error('Failed to save developer', error);
           this.developerForm.update((state) => ({
@@ -424,9 +449,7 @@ export class DevelopersOverviewComponent implements OnInit {
     formData.append('bankDetails[iban]', form.bankDetails.iban || '');
     formData.append('bankDetails[swiftCode]', form.bankDetails.swiftCode || '');
     
-    form.internalAttachments.forEach((file) => {
-      formData.append('internalAttachments', file, file.name);
-    });
+    // Internal attachments are now uploaded separately to S3, not included in FormData
 
     if (form.logoFile) {
       formData.append('logo', form.logoFile);

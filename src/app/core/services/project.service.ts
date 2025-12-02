@@ -83,6 +83,13 @@ export class ProjectService {
     return this.http.delete<Project>(`${this.baseUrl}/${projectId}/internal-attachments/${attachmentId}`);
   }
 
+  uploadInternalAttachment(projectId: string, file: File): Observable<Project> {
+    const formData = new FormData();
+    formData.append('file', file);
+    this.clearCache();
+    return this.http.post<Project>(`${this.baseUrl}/${projectId}/internal-attachments`, formData);
+  }
+
   updateStatus(projectId: string, status: string): Observable<Project> {
     this.clearCache();
     return this.http.put<Project>(`${this.baseUrl}/${projectId}`, { status });

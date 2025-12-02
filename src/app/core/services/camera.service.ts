@@ -285,6 +285,16 @@ export class CameraService {
     );
   }
 
+  uploadInternalAttachment(cameraId: string, file: File): Observable<Camera> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<Camera>(`${this.baseUrl}/${cameraId}/internal-attachments`, formData).pipe(
+      tap(() => {
+        this.clearCache();
+      }),
+    );
+  }
+
   clearCache(): void {
     this.cache = null;
     this.request$ = undefined;

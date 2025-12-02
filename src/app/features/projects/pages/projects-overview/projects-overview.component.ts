@@ -2,8 +2,8 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { of } from 'rxjs';
-import { catchError, finalize } from 'rxjs/operators';
+import { of, forkJoin } from 'rxjs';
+import { catchError, finalize, switchMap, map } from 'rxjs/operators';
 import { ProjectService } from '@core/services/project.service';
 import { DeveloperService } from '@core/services/developer.service';
 import { Project, ProjectInternalAttachment } from '@core/models/project.model';
@@ -346,6 +346,7 @@ export class ProjectsOverviewComponent implements OnInit {
       return;
     }
 
+    const attachmentsToUpload = [...form.internalAttachments];
     const formData = this.buildFormData(form);
     const project = this.editProjectModal();
 
@@ -356,6 +357,30 @@ export class ProjectsOverviewComponent implements OnInit {
     request
       .pipe(
         takeUntilDestroyed(this.destroyRef),
+        switchMap((saved) => {
+          if (!saved || attachmentsToUpload.length === 0) {
+            return of(saved);
+          }
+          // Upload attachments to S3 separately
+          const uploadRequests = attachmentsToUpload.map((file) =>
+            this.projectService.uploadInternalAttachment(saved._id, file).pipe(
+              catchError((error) => {
+                console.error('Failed to upload attachment', file.name, error);
+                return of(saved); // Continue even if one attachment fails
+              }),
+            ),
+          );
+          return forkJoin(uploadRequests).pipe(
+            switchMap(() => {
+              const refreshed = this.projectService.getById(saved._id);
+              return refreshed.pipe(
+                map((proj) => proj || saved),
+                catchError(() => of(saved)),
+              );
+            }),
+            catchError(() => of(saved)), // Return saved project even if refresh fails
+          );
+        }),
         catchError((error) => {
           console.error('Failed to save project', error);
           this.projectForm.update((state) => ({
@@ -507,10 +532,7 @@ export class ProjectsOverviewComponent implements OnInit {
       formData.append('logo', this.editProjectModal()!.logo!);
     }
 
-    // Append internal attachments
-    form.internalAttachments.forEach((file) => {
-      formData.append('internalAttachments', file);
-    });
+    // Internal attachments are now uploaded separately to S3, not included in FormData
 
     return formData;
   }

@@ -3,8 +3,8 @@ import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angula
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Observable, of } from 'rxjs';
-import { catchError, finalize } from 'rxjs/operators';
+import { Observable, of, forkJoin } from 'rxjs';
+import { catchError, finalize, switchMap, map } from 'rxjs/operators';
 import { CameraService } from '@core/services/camera.service';
 import { DeveloperService } from '@core/services/developer.service';
 import { ProjectService } from '@core/services/project.service';
@@ -353,14 +353,14 @@ export class CameraFormComponent implements OnInit {
 
     this.cameraForm.update((f) => ({ ...f, isSaving: true, error: null }));
 
-    // Use FormData if there are attachments or internal description, otherwise use JSON
-    const hasAttachments = form.internalAttachments.length > 0;
+    const attachmentsToUpload = [...form.internalAttachments];
     const hasInternalDescription = form.internalDescription.trim().length > 0;
 
+    // Use FormData if there's internal description, otherwise use JSON
     let request: Observable<Camera>;
 
-    if (hasAttachments || hasInternalDescription) {
-      // Use FormData for file uploads
+    if (hasInternalDescription) {
+      // Use FormData for internal description
       const formData = new FormData();
       formData.append('developer', form.developer);
       formData.append('project', form.project);
@@ -375,10 +375,7 @@ export class CameraFormComponent implements OnInit {
       formData.append('country', form.country);
       formData.append('server', form.server);
 
-      // Append internal attachments
-      form.internalAttachments.forEach((file) => {
-        formData.append('internalAttachments', file, file.name);
-      });
+      // Internal attachments are now uploaded separately to S3, not included in FormData
 
       request = this.isEditMode() && this.cameraId()
         ? this.cameraService.update(this.cameraId()!, formData)
@@ -408,6 +405,30 @@ export class CameraFormComponent implements OnInit {
     request
       .pipe(
         takeUntilDestroyed(this.destroyRef),
+        switchMap((camera) => {
+          if (!camera || attachmentsToUpload.length === 0) {
+            return of(camera);
+          }
+          // Upload attachments to S3 separately
+          const uploadRequests = attachmentsToUpload.map((file) =>
+            this.cameraService.uploadInternalAttachment(camera._id, file).pipe(
+              catchError((error) => {
+                console.error('Failed to upload attachment', file.name, error);
+                return of(camera); // Continue even if one attachment fails
+              }),
+            ),
+          );
+          return forkJoin(uploadRequests).pipe(
+            switchMap(() => {
+              const refreshed = this.cameraService.getById(camera._id);
+              return refreshed.pipe(
+                map((cam) => cam || camera),
+                catchError(() => of(camera)),
+              );
+            }),
+            catchError(() => of(camera)), // Return saved camera even if refresh fails
+          );
+        }),
         catchError((error) => {
           console.error('Failed to save camera', error);
           this.cameraForm.update((f) => ({
