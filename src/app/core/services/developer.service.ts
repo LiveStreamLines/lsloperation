@@ -65,13 +65,6 @@ export class DeveloperService {
     return this.http.delete<Developer>(`${this.baseUrl}/${developerId}/attachments/${attachmentId}`);
   }
 
-  uploadInternalAttachment(developerId: string, file: File): Observable<Developer> {
-    const formData = new FormData();
-    formData.append('file', file);
-    this.clearCache();
-    return this.http.post<Developer>(`${this.baseUrl}/${developerId}/internal-attachments`, formData);
-  }
-
   clearCache(): void {
     this.cache = null;
     this.request$ = undefined;
