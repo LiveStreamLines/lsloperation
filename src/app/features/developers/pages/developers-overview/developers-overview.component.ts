@@ -94,15 +94,21 @@ export class DevelopersOverviewComponent implements OnInit {
     
     // Apply search filter
     const term = this.searchTerm().toLowerCase().trim();
-    if (!term) {
-      return developers;
+    if (term) {
+      developers = developers.filter(
+        (dev) =>
+          dev.developerName?.toLowerCase().includes(term) ||
+          dev.developerTag?.toLowerCase().includes(term) ||
+          dev.description?.toLowerCase().includes(term),
+      );
     }
-    return developers.filter(
-      (dev) =>
-        dev.developerName?.toLowerCase().includes(term) ||
-        dev.developerTag?.toLowerCase().includes(term) ||
-        dev.description?.toLowerCase().includes(term),
-    );
+    
+    // Sort alphabetically by developer name
+    return developers.sort((a, b) => {
+      const nameA = (a.developerName || '').toLowerCase();
+      const nameB = (b.developerName || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
   });
 
   ngOnInit(): void {
