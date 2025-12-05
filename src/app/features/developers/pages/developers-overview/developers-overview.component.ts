@@ -276,7 +276,24 @@ export class DevelopersOverviewComponent implements OnInit {
       return;
     }
 
-    const formData = this.buildFormData(form);
+    // Set country from logged-in user's country if available
+    const user = this.authStore.user();
+    let formToUse = form;
+    if (user?.country && user.country !== 'All' && typeof user.country === 'string') {
+      // Update form with user's country before building FormData
+      this.developerForm.update((state) => ({
+        ...state,
+        address: {
+          ...state.address,
+          country: user.country as string,
+        },
+      }));
+      // Get updated form with country set
+      formToUse = this.developerForm();
+    }
+
+    const formData = this.buildFormData(formToUse);
+
     const developer = this.editDeveloperModal();
 
     this.developerForm.update((state) => ({ ...state, isSaving: true, error: null }));
