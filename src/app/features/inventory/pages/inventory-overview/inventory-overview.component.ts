@@ -111,23 +111,50 @@ export class InventoryOverviewComponent implements OnInit {
     const map = new Map<string, AssignedUserOption>();
 
     for (const item of items) {
-      const assignment = item.currentUserAssignment;
-      if (!assignment?.userId) {
-        continue;
-      }
+      const isNoSerial = this.isNoSerialDeviceType(item);
+      
+      if (isNoSerial) {
+        // For no-serial devices, check userAssignments array and sum quantities
+        const userAssignments = item.userAssignments ?? [];
+        for (const userAssignment of userAssignments) {
+          if (!userAssignment.userId || (userAssignment.qty || 0) <= 0) {
+            continue;
+          }
 
-      const existing = map.get(assignment.userId);
-      if (existing) {
-        existing.count += 1;
-        continue;
-      }
+          const qty = userAssignment.qty || 0;
+          const existing = map.get(userAssignment.userId);
+          if (existing) {
+            existing.count += qty;
+            continue;
+          }
 
-      const name = assignment.userName ?? this.adminMap().get(assignment.userId)?.name ?? 'Unknown user';
-      map.set(assignment.userId, {
-        id: assignment.userId,
-        name,
-        count: 1,
-      });
+          const name = userAssignment.userName ?? this.adminMap().get(userAssignment.userId)?.name ?? 'Unknown user';
+          map.set(userAssignment.userId, {
+            id: userAssignment.userId,
+            name,
+            count: qty,
+          });
+        }
+      } else {
+        // For serialized devices, check currentUserAssignment
+        const assignment = item.currentUserAssignment;
+        if (!assignment?.userId) {
+          continue;
+        }
+
+        const existing = map.get(assignment.userId);
+        if (existing) {
+          existing.count += 1;
+          continue;
+        }
+
+        const name = assignment.userName ?? this.adminMap().get(assignment.userId)?.name ?? 'Unknown user';
+        map.set(assignment.userId, {
+          id: assignment.userId,
+          name,
+          count: 1,
+        });
+      }
     }
 
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
@@ -1843,6 +1870,13 @@ export class InventoryOverviewComponent implements OnInit {
       return true;
     }
 
+    // For no-serial devices, check userAssignments array
+    if (this.isNoSerialDeviceType(item)) {
+      const userAssignments = item.userAssignments ?? [];
+      return userAssignments.some(ua => ua.userId === adminId && (ua.qty || 0) > 0);
+    }
+
+    // For serialized devices, check currentUserAssignment
     const currentUserAssignment = item.currentUserAssignment;
     return (currentUserAssignment?.userId ?? null) === adminId;
   }
@@ -1982,6 +2016,17 @@ export class InventoryOverviewComponent implements OnInit {
       if (currentUserId) {
         filtered = filtered.filter(
           (item) => {
+            // For no-serial devices, check userAssignments array
+            if (this.isNoSerialDeviceType(item)) {
+              const userAssignments = item.userAssignments ?? [];
+              return userAssignments.some(ua => {
+                const uaUserId = String(ua.userId || '').trim();
+                const currentId = String(currentUserId).trim();
+                return uaUserId === currentId && (ua.qty || 0) > 0;
+              });
+            }
+            
+            // For serialized devices, check currentUserAssignment
             const assignmentUserId = item.currentUserAssignment?.userId;
             if (!assignmentUserId) {
               return false; // No assignment means not assigned to this user
