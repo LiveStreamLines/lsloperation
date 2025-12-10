@@ -663,26 +663,39 @@ export class InventoryOverviewComponent implements OnInit {
     return deviceType?.noSerial ?? false;
   }
 
-  // Get combined status display for no-serial devices (without quantities)
+  // Get combined status display for no-serial devices with quantities
   getNoSerialStatusDisplay(item: InventoryItem): string {
     const parts: string[] = [];
+    const currentUserId = this.currentUserId();
+    const isSuperAdmin = this.isSuperAdmin();
     
-    // In stock
+    // For regular users: only show their assigned quantity
+    if (!isSuperAdmin && currentUserId) {
+      const userAssignment = item.userAssignments?.find(ua => ua.userId === currentUserId);
+      const userQty = userAssignment?.qty || 0;
+      if (userQty > 0) {
+        return `With user - ${userQty}`;
+      }
+      return 'No assignment';
+    }
+    
+    // For super admins: show all statuses
+    // In stock - qty
     const inStock = item.inStock ?? 0;
     if (inStock > 0) {
-      parts.push('In stock');
+      parts.push(`In stock - ${inStock}`);
     }
     
-    // Assigned to users
+    // With user - qty (total)
     const assignedToUsers = item.userAssignments?.reduce((sum, a) => sum + (a.qty || 0), 0) ?? 0;
     if (assignedToUsers > 0) {
-      parts.push('Assigned to user');
+      parts.push(`With user - ${assignedToUsers}`);
     }
     
-    // Assigned to projects
+    // In project - qty
     const assignedToProjects = item.projectAssignments?.reduce((sum, a) => sum + (a.qty || 0), 0) ?? 0;
     if (assignedToProjects > 0) {
-      parts.push('Assigned to project');
+      parts.push(`In project - ${assignedToProjects}`);
     }
     
     return parts.length > 0 ? parts.join(' • ') : 'No stock';
