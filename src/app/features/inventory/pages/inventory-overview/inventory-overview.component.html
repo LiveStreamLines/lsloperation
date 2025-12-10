@@ -392,12 +392,30 @@
                   }
                 </td>
                 <td class="px-5 py-4">
-                  <span
-                    class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
-                    [ngClass]="statusColor(item.status)"
-                  >
-                    {{ statusLabel(item.status, item) }}
-                  </span>
+                  @if (isNoSerialDeviceType(item)) {
+                    <div class="flex flex-wrap gap-2">
+                      @for (badge of getNoSerialStatusBadges(item); track badge.label) {
+                        <span
+                          class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+                          [ngClass]="badge.color"
+                        >
+                          {{ badge.label }} - {{ badge.qty }}
+                        </span>
+                      }
+                      @if (getNoSerialStatusBadges(item).length === 0) {
+                        <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-slate-200 text-slate-700">
+                          No stock
+                        </span>
+                      }
+                    </div>
+                  } @else {
+                    <span
+                      class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+                      [ngClass]="statusColor(item.status)"
+                    >
+                      {{ statusLabel(item.status, item) }}
+                    </span>
+                  }
                 </td>
                 <td class="px-5 py-4">
                   <div class="flex flex-wrap justify-end gap-2">

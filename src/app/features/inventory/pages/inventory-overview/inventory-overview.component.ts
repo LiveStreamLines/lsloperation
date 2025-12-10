@@ -478,42 +478,50 @@ export class InventoryOverviewComponent implements OnInit {
   readonly metricCards = computed<InventoryMetricCard[]>(() => {
     const list = this.filteredItems();
     
-    // Total inventory: sum of all item quantities
-    const total = list.reduce((sum, item) => sum + this.getItemQuantity(item), 0);
-
-    // Projects: sum quantities of items assigned to projects
-    const assignedItems = list.filter((item) => this.normalizeStatus(item.status) === 'assigned');
-    const assigned = assignedItems.reduce((sum, item) => sum + this.getItemQuantity(item), 0);
+    let total = 0;
+    let assigned = 0;
+    let userAssignedTotal = 0;
+    let available = 0;
     
-    // Technicians: sum of assigned quantities (partial assignments from currentUserAssignment.quantity)
-    const userAssignedTotal = list.reduce((sum, item) => {
-      const assignedQty = item.currentUserAssignment?.quantity;
-      if (assignedQty && typeof assignedQty === 'number' && assignedQty > 0) {
-        return sum + assignedQty;
+    for (const item of list) {
+      if (this.isNoSerialDeviceType(item)) {
+        // For no-serial devices: use quantity field
+        const itemQty = item.quantity ?? 0;
+        total += itemQty;
+        
+        // Projects: sum from projectAssignments
+        const assignedToProjects = item.projectAssignments?.reduce((sum, a) => sum + (a.qty || 0), 0) ?? 0;
+        assigned += assignedToProjects;
+        
+        // Technicians: sum from userAssignments
+        const assignedToUsers = item.userAssignments?.reduce((sum, a) => sum + (a.qty || 0), 0) ?? 0;
+        userAssignedTotal += assignedToUsers;
+        
+        // In Stock: use inStock field
+        const inStock = item.inStock ?? 0;
+        available += inStock;
+      } else {
+        // For serialized devices: use existing logic
+        const itemQty = this.getItemQuantity(item);
+        total += itemQty;
+        
+        // Projects: check status
+        if (this.normalizeStatus(item.status) === 'assigned') {
+          assigned += itemQty;
+        }
+        
+        // Technicians: check currentUserAssignment
+        const assignedQty = item.currentUserAssignment?.quantity;
+        if (assignedQty && typeof assignedQty === 'number' && assignedQty > 0) {
+          userAssignedTotal += assignedQty;
+        }
+        
+        // In Stock: available if status is available and not assigned
+        if (this.normalizeStatus(item.status) === 'available' && !item.currentAssignment && !item.currentUserAssignment) {
+          available += itemQty;
+        }
       }
-      return sum;
-    }, 0);
-    
-    // In Stock: available quantity (total - assigned)
-    // For all items: calculate remaining unassigned quantity
-    const available = list.reduce((sum, item) => {
-      const itemQty = this.getItemQuantity(item);
-      const assignedQty = item.currentUserAssignment?.quantity;
-      
-      // If item has partial user assignment, calculate remaining quantity
-      if (assignedQty && typeof assignedQty === 'number' && assignedQty > 0) {
-        const remaining = itemQty - assignedQty;
-        return sum + Math.max(0, remaining);
-      }
-      
-      // If item is fully available (no user assignments), add full quantity
-      // Only count items that are actually available (not assigned to projects)
-      if (this.normalizeStatus(item.status) === 'available' && !item.currentAssignment) {
-        return sum + itemQty;
-      }
-      
-      return sum;
-    }, 0);
+    }
     
     const retiredItems = list.filter((item) => {
       const normalized = this.normalizeStatus(item.status);
@@ -663,9 +671,9 @@ export class InventoryOverviewComponent implements OnInit {
     return deviceType?.noSerial ?? false;
   }
 
-  // Get combined status display for no-serial devices with quantities
-  getNoSerialStatusDisplay(item: InventoryItem): string {
-    const parts: string[] = [];
+  // Get status badges for no-serial devices with colors
+  getNoSerialStatusBadges(item: InventoryItem): Array<{label: string; qty: number; color: string}> {
+    const badges: Array<{label: string; qty: number; color: string}> = [];
     const currentUserId = this.currentUserId();
     const isSuperAdmin = this.isSuperAdmin();
     
@@ -674,31 +682,40 @@ export class InventoryOverviewComponent implements OnInit {
       const userAssignment = item.userAssignments?.find(ua => ua.userId === currentUserId);
       const userQty = userAssignment?.qty || 0;
       if (userQty > 0) {
-        return `With user - ${userQty}`;
+        badges.push({ label: 'With user', qty: userQty, color: 'bg-amber-100 text-amber-700' });
       }
-      return 'No assignment';
+      return badges;
     }
     
-    // For super admins: show all statuses
-    // In stock - qty
+    // For super admins: show all statuses with colors
+    // In stock - green
     const inStock = item.inStock ?? 0;
     if (inStock > 0) {
-      parts.push(`In stock - ${inStock}`);
+      badges.push({ label: 'In stock', qty: inStock, color: 'bg-emerald-100 text-emerald-700' });
     }
     
-    // With user - qty (total)
+    // With user - orange
     const assignedToUsers = item.userAssignments?.reduce((sum, a) => sum + (a.qty || 0), 0) ?? 0;
     if (assignedToUsers > 0) {
-      parts.push(`With user - ${assignedToUsers}`);
+      badges.push({ label: 'With user', qty: assignedToUsers, color: 'bg-amber-100 text-amber-700' });
     }
     
-    // In project - qty
+    // In project - red
     const assignedToProjects = item.projectAssignments?.reduce((sum, a) => sum + (a.qty || 0), 0) ?? 0;
     if (assignedToProjects > 0) {
-      parts.push(`In project - ${assignedToProjects}`);
+      badges.push({ label: 'In project', qty: assignedToProjects, color: 'bg-rose-100 text-rose-700' });
     }
     
-    return parts.length > 0 ? parts.join(' • ') : 'No stock';
+    return badges;
+  }
+
+  // Get combined status display for no-serial devices (for backward compatibility)
+  getNoSerialStatusDisplay(item: InventoryItem): string {
+    const badges = this.getNoSerialStatusBadges(item);
+    if (badges.length === 0) {
+      return 'No stock';
+    }
+    return badges.map(b => `${b.label} - ${b.qty}`).join(' • ');
   }
 
   statusLabel(status: string | undefined, item?: InventoryItem): string {
@@ -1868,10 +1885,48 @@ export class InventoryOverviewComponent implements OnInit {
   }
 
   private appliesStatusFilter(item: InventoryItem, status: string | null): boolean {
-    const matchesStatus = !status || this.normalizeStatus(item.status) === status;
+    if (!status) {
+      if (this.showAlarmedOnly()) {
+        return this.isAlarmed(item);
+      }
+      return true;
+    }
+
+    // For no-serial devices, check actual quantities
+    if (this.isNoSerialDeviceType(item)) {
+      const normalized = this.normalizeStatus(status);
+      
+      if (normalized === 'available') {
+        // Show if in stock > 0
+        const inStock = item.inStock ?? 0;
+        return inStock > 0;
+      }
+      
+      if (normalized === 'user_assigned') {
+        // Show if assigned to users > 0
+        const assignedToUsers = item.userAssignments?.reduce((sum, a) => sum + (a.qty || 0), 0) ?? 0;
+        return assignedToUsers > 0;
+      }
+      
+      if (normalized === 'assigned') {
+        // Show if assigned to projects > 0
+        const assignedToProjects = item.projectAssignments?.reduce((sum, a) => sum + (a.qty || 0), 0) ?? 0;
+        return assignedToProjects > 0;
+      }
+      
+      if (normalized === 'retired') {
+        return this.normalizeStatus(item.status) === 'retired';
+      }
+      
+      return false;
+    }
+
+    // For serialized devices, use the old logic
+    const matchesStatus = this.normalizeStatus(item.status) === status;
     if (!matchesStatus) {
       return false;
     }
+    
     if (this.showAlarmedOnly()) {
       return this.isAlarmed(item);
     }
