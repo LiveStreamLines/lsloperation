@@ -7,7 +7,7 @@ import { of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
 import { TaskService } from '@core/services/task.service';
 import { UserService } from '@core/services/user.service';
-import { Task, TaskType } from '@core/models/task.model';
+import { Task, TaskNote, TaskType, TASK_TYPE_OPTIONS, getTaskTypeLabel } from '@core/models/task.model';
 import { User } from '@core/models/user.model';
 import { AuthStore } from '@core/auth/auth.store';
 
@@ -42,7 +42,7 @@ export class TasksOverviewComponent implements OnInit {
   readonly users = signal<User[]>([]);
   readonly searchTerm = signal('');
   readonly statusFilter = signal<'all' | 'open' | 'closed'>('all');
-  readonly typeFilter = signal<string>('all');
+  readonly typeFilter = signal<'all' | TaskType>('all');
 
   readonly editTaskModal = signal<Task | null>(null);
   readonly isAddMode = signal(false);
@@ -63,12 +63,7 @@ export class TasksOverviewComponent implements OnInit {
     return allUsers.filter((user) => user.country === currentUser.country);
   });
 
-  readonly taskTypes: { value: TaskType; label: string }[] = [
-    { value: 'purchase_request', label: 'Purchase Request' },
-    { value: 'site_visit_request', label: 'Site Visit Request' },
-    { value: 'media_image_filtration', label: 'Media Image Filtration' },
-    { value: 'other', label: 'Other' },
-  ];
+  readonly taskTypes = TASK_TYPE_OPTIONS;
 
   readonly filteredTasks = computed(() => {
     let tasks = this.tasks();
@@ -149,7 +144,14 @@ export class TasksOverviewComponent implements OnInit {
   }
 
   onTypeFilterChange(value: string): void {
-    this.typeFilter.set(value);
+    const normalized = (value || 'all').toString().trim().toLowerCase();
+    if (normalized === 'all') {
+      this.typeFilter.set('all');
+      return;
+    } else {
+      const allowed: TaskType[] = ['operation', 'finance', 'media', 'other'];
+      this.typeFilter.set(allowed.includes(normalized as TaskType) ? (normalized as TaskType) : 'all');
+    }
   }
 
   openAddTaskModal(): void {
@@ -277,8 +279,31 @@ export class TasksOverviewComponent implements OnInit {
     }
   }
 
-  getTaskTypeLabel(type: TaskType): string {
-    return this.taskTypes.find((t) => t.value === type)?.label || type;
+  formatDateTime(date: string | undefined): string {
+    if (!date) {
+      return '—';
+    }
+    try {
+      return new Date(date).toLocaleString();
+    } catch {
+      return '—';
+    }
+  }
+
+  getTaskTypeLabel(type: string): string {
+    return getTaskTypeLabel(type);
+  }
+
+  getLatestNote(task: Task): TaskNote | null {
+    const notes = task.notes ?? [];
+    if (!notes.length) {
+      return null;
+    }
+    return notes.reduce((latest, note) => {
+      const latestTs = new Date(latest.createdAt).getTime();
+      const noteTs = new Date(note.createdAt).getTime();
+      return noteTs > latestTs ? note : latest;
+    }, notes[0]);
   }
 
   private createEmptyForm(): TaskFormState {

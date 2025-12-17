@@ -6,7 +6,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
 import { TaskService } from '@core/services/task.service';
-import { Task, TaskNote } from '@core/models/task.model';
+import { Task, getTaskTypeLabel } from '@core/models/task.model';
 import { AuthStore } from '@core/auth/auth.store';
 import { environment } from '@env';
 
@@ -217,6 +217,10 @@ export class TaskDetailsComponent implements OnInit {
     } catch {
       return '—';
     }
+  }
+
+  getTaskTypeLabel(type: string | undefined): string {
+    return getTaskTypeLabel(type);
   }
 
   goBack(): void {

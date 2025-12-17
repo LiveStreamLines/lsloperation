@@ -106,6 +106,7 @@
                   <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Approver</th>
                   <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Status</th>
                   <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Created</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Last note</th>
                   <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Actions</th>
                 </tr>
               </thead>
@@ -135,6 +136,15 @@
                       </span>
                     </td>
                     <td class="px-6 py-4 text-sm text-slate-600">{{ formatDate(task.createdDate) }}</td>
+                    <td class="px-6 py-4">
+                      @let note = getLatestNote(task);
+                      @if (note) {
+                        <div class="text-sm text-slate-700">{{ note.userName || '—' }}</div>
+                        <div class="text-xs text-slate-500">{{ formatDateTime(note.createdAt) }}</div>
+                      } @else {
+                        <span class="text-sm text-slate-400">—</span>
+                      }
+                    </td>
                     <td class="px-6 py-4">
                       <button
                         type="button"

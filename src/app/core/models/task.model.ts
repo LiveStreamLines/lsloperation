@@ -1,10 +1,18 @@
 export type TaskStatus = 'open' | 'closed';
 
-export type TaskType =
-  | 'purchase_request'
-  | 'site_visit_request'
-  | 'media_image_filtration'
-  | 'other';
+export type TaskType = 'operation' | 'finance' | 'media' | 'other';
+
+export const TASK_TYPE_OPTIONS: Array<{ value: TaskType; label: string }> = [
+  { value: 'operation', label: 'Operation' },
+  { value: 'finance', label: 'Finance' },
+  { value: 'media', label: 'Media' },
+  { value: 'other', label: 'Other' },
+];
+
+export function getTaskTypeLabel(type: string | undefined | null): string {
+  const normalized = (type ?? '').trim().toLowerCase();
+  return TASK_TYPE_OPTIONS.find((t) => t.value === (normalized as TaskType))?.label ?? 'Other';
+}
 
 export interface TaskAttachment {
   _id: string;
