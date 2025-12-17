@@ -106,7 +106,13 @@
           [ngClass]="selectedStatus() === status.value ? 'border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-300' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'"
           (click)="onStatusChange(status.value ?? '')"
         >
-          {{ status.label }}
+          <span>{{ status.label }}</span>
+          <span
+            class="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+            [ngClass]="selectedStatus() === status.value ? 'text-indigo-100' : 'text-slate-400'"
+          >
+            {{ status.count }}
+          </span>
         </button>
       }
       <button
@@ -432,8 +438,8 @@
                           Assign to user
                         </button>
                       }
-                      @if (hasUserAssignments(item) || (item.status === 'user_assigned' && !isNoSerialDeviceType(item))) {
-                        <!-- Show Return button if user has assigned quantity (no-serial) or status is user_assigned (serialized) -->
+                      @if ((isNoSerialDeviceType(item) && hasAnyUserAssignments(item)) || (!isNoSerialDeviceType(item) && item.status === 'user_assigned')) {
+                        <!-- Show Return button if any user has assigned quantity (no-serial) or status is user_assigned (serialized) -->
                         <button
                           type="button"
                           class="rounded-2xl border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-600 transition hover:bg-amber-50 disabled:opacity-60"
@@ -1116,19 +1122,38 @@
         }
 
         @if (isNoSerialDeviceType(unassignUserModalItem()!)) {
+          @if (canSelectReturnUser()) {
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+              <span class="font-semibold text-slate-800">User</span>
+              <select
+                class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                [value]="unassignUserState().userId"
+                (change)="onUnassignUserUserChange($any($event.target).value)"
+              >
+                <option value="">Select user</option>
+                @for (option of getNoSerialReturnUserOptions(unassignUserModalItem()!); track option.id) {
+                  <option [value]="option.id">{{ option.name }} ({{ option.qty }})</option>
+                }
+              </select>
+            </label>
+          }
+
           <label class="flex flex-col gap-2 text-sm text-slate-600">
             <span class="font-semibold text-slate-800">Quantity</span>
             <input
               type="number"
               min="1"
-              [max]="getUserAssignedQuantity(unassignUserModalItem()!)"
+              [max]="getUserAssignedQuantity(unassignUserModalItem()!, unassignUserState().userId) || 1"
               step="1"
-              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
               placeholder="Enter quantity to return"
+              [disabled]="canSelectReturnUser() && !unassignUserState().userId"
               [value]="unassignUserState().quantity"
               (input)="onUnassignUserQuantityChange($any($event.target).value)"
             />
-            <span class="text-xs text-slate-500">Maximum returnable: {{ getUserAssignedQuantity(unassignUserModalItem()!) }}</span>
+            <span class="text-xs text-slate-500">
+              Maximum returnable: {{ getUserAssignedQuantity(unassignUserModalItem()!, unassignUserState().userId) }}
+            </span>
           </label>
         }
 
@@ -1155,7 +1180,7 @@
             type="button"
             class="inline-flex items-center rounded-2xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-300 transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
             (click)="saveUnassignUser()"
-            [disabled]="unassignUserState().isSaving"
+            [disabled]="unassignUserState().isSaving || (isNoSerialDeviceType(unassignUserModalItem()!) && canSelectReturnUser() && !unassignUserState().userId)"
           >
             <span>Unassign</span>
             @if (unassignUserState().isSaving) {
@@ -1205,7 +1230,25 @@
           </div>
           <div>
             <p class="text-xs uppercase tracking-wide text-slate-500">Current status</p>
-            <p class="text-sm font-semibold text-slate-900">{{ statusLabel(viewItemModal()?.status) }}</p>
+            @if (viewItemModal() && isNoSerialDeviceType(viewItemModal()!)) {
+              <div class="mt-1 flex flex-wrap gap-2">
+                @for (badge of getNoSerialStatusBadges(viewItemModal()!); track badge.label) {
+                  <span
+                    class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+                    [ngClass]="badge.color"
+                  >
+                    {{ badge.label }} - {{ badge.qty }}
+                  </span>
+                }
+                @if (getNoSerialStatusBadges(viewItemModal()!).length === 0) {
+                  <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-slate-200 text-slate-700">
+                    No stock
+                  </span>
+                }
+              </div>
+            } @else {
+              <p class="text-sm font-semibold text-slate-900">{{ statusLabel(viewItemModal()?.status) }}</p>
+            }
           </div>
           <div>
             <p class="text-xs uppercase tracking-wide text-slate-500">Created</p>
