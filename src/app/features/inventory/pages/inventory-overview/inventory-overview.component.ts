@@ -345,23 +345,25 @@ export class InventoryOverviewComponent implements OnInit {
     return (user.id || (user as any)?.['_id'] || (user as any)?._id) as string | null;
   });
   readonly isSuperAdmin = computed(() => this.currentUser()?.role === 'Super Admin');
+  // Treat "Stock keeper" permission as inventory admin (same behavior as Super Admin inside Inventory)
+  readonly isInventoryAdmin = computed(() => this.isSuperAdmin() || ((this.currentUser() as any)?.canAssignToUser ?? false));
   readonly accessibleDevelopers = computed(() => this.currentUser()?.accessibleDevelopers ?? []);
   
   // Permission checks
   readonly canAddDeviceType = computed(
-    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canAddDeviceType ?? false),
+    () => this.isInventoryAdmin() || ((this.currentUser() as any)?.canAddDeviceType ?? false),
   );
   readonly canAddDeviceStock = computed(
-    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canAddDeviceStock ?? false),
+    () => this.isInventoryAdmin() || ((this.currentUser() as any)?.canAddDeviceStock ?? false),
   );
   readonly hasInventoryAccess = computed(
     () => this.isSuperAdmin() || ((this.currentUser() as any)?.hasInventoryAccess ?? false),
   );
   readonly canSeeAllInventory = computed(
-    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canSeeAllInventory ?? false),
+    () => this.isInventoryAdmin() || ((this.currentUser() as any)?.canSeeAllInventory ?? false),
   );
   readonly canAssignToUserPermission = computed(
-    () => this.isSuperAdmin() || ((this.currentUser() as any)?.canAssignToUser ?? false),
+    () => this.isInventoryAdmin() || ((this.currentUser() as any)?.canAssignToUser ?? false),
   );
   // Check if user has only basic inventory access (no see all permission)
   // Users with just inventory access (without "see all inventory") should only see devices assigned to them
@@ -814,10 +816,10 @@ export class InventoryOverviewComponent implements OnInit {
   getNoSerialStatusBadges(item: InventoryItem): Array<{label: string; qty: number; color: string}> {
     const badges: Array<{label: string; qty: number; color: string}> = [];
     const currentUserId = this.currentUserId();
-    const isSuperAdmin = this.isSuperAdmin();
+    const isInventoryAdmin = this.isInventoryAdmin();
     
     // For regular users: only show their assigned quantity
-    if (!isSuperAdmin && currentUserId) {
+    if (!isInventoryAdmin && currentUserId) {
       const userAssignment = item.userAssignments?.find(ua => ua.userId === currentUserId);
       const userQty = userAssignment?.qty || 0;
       if (userQty > 0) {
@@ -826,7 +828,7 @@ export class InventoryOverviewComponent implements OnInit {
       return badges;
     }
     
-    // For super admins: show all statuses with colors
+    // For inventory admins: show all statuses with colors
     // In stock - green
     const inStock = item.inStock ?? 0;
     if (inStock > 0) {
@@ -2217,8 +2219,8 @@ export class InventoryOverviewComponent implements OnInit {
 
   private appliesCountryFilter(item: InventoryItem): boolean {
     const user = this.authStore.user();
-    // Super Admins see all items regardless of country
-    if (this.isSuperAdmin()) {
+    // Inventory admins see all items regardless of country
+    if (this.isInventoryAdmin()) {
       return true;
     }
     

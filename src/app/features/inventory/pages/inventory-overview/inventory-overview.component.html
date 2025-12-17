@@ -344,18 +344,26 @@
                   </div>
                 </td>
                 <td class="px-5 py-4">
-                  <div class="flex flex-col gap-1 text-xs text-slate-600">
-                    <span>{{ assignmentSummary(item) }}</span>
-                    <span *ngIf="item.currentAssignment?.assignedDate as assigned"
-                      >Since {{ assigned | date: 'mediumDate' }}</span
-                    >
-                    <span *ngIf="item.currentUserAssignment?.assignedDate as assigned"
-                      >Since {{ assigned | date: 'mediumDate' }}</span
-                    >
-                  </div>
+                  @if (isNoSerialDeviceType(item)) {
+                    <span class="text-sm text-slate-400">—</span>
+                  } @else {
+                    <div class="flex flex-col gap-1 text-xs text-slate-600">
+                      <span>{{ assignmentSummary(item) }}</span>
+                      <span *ngIf="item.currentAssignment?.assignedDate as assigned"
+                        >Since {{ assigned | date: 'mediumDate' }}</span
+                      >
+                      <span *ngIf="item.currentUserAssignment?.assignedDate as assigned"
+                        >Since {{ assigned | date: 'mediumDate' }}</span
+                      >
+                    </div>
+                  }
                 </td>
                 <td class="px-5 py-4">
-                  <span class="text-sm text-slate-600">{{ lastMovement(item) }}</span>
+                  @if (isNoSerialDeviceType(item)) {
+                    <span class="text-sm text-slate-400">—</span>
+                  } @else {
+                    <span class="text-sm text-slate-600">{{ lastMovement(item) }}</span>
+                  }
                 </td>
                 <td class="px-5 py-4">
                   @let age = getItemAgeInDays(item);
