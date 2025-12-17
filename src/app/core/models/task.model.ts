@@ -44,8 +44,8 @@ export interface Task {
   assigneeName: string;
   assigned: string;
   assignedName: string;
-  approver?: string | null;
-  approverName?: string | null;
+  concernedUsers: string[];
+  concernedNames: string[];
   status: TaskStatus;
   attachments: TaskAttachment[];
   notes: TaskNote[];

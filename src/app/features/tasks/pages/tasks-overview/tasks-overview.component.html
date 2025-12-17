@@ -103,7 +103,7 @@
                   <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Type</th>
                   <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Assignee</th>
                   <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Assigned By</th>
-                  <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Approver</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Concerned</th>
                   <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Status</th>
                   <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Created</th>
                   <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">Last note</th>
@@ -122,7 +122,13 @@
                     <td class="px-6 py-4 text-sm text-slate-600">{{ getTaskTypeLabel(task.type) }}</td>
                     <td class="px-6 py-4 text-sm text-slate-600">{{ task.assigneeName || '—' }}</td>
                     <td class="px-6 py-4 text-sm text-slate-600">{{ task.assignedName || '—' }}</td>
-                    <td class="px-6 py-4 text-sm text-slate-600">{{ task.approverName || '—' }}</td>
+                    <td class="px-6 py-4 text-sm text-slate-600">
+                      @if (task.concernedNames.length > 0) {
+                        <span class="line-clamp-1">{{ task.concernedNames.join(', ') }}</span>
+                      } @else {
+                        <span class="text-slate-400">—</span>
+                      }
+                    </td>
                     <td class="px-6 py-4">
                       <span
                         class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide"
@@ -138,11 +144,30 @@
                     <td class="px-6 py-4 text-sm text-slate-600">{{ formatDate(task.createdDate) }}</td>
                     <td class="px-6 py-4">
                       @let note = getLatestNote(task);
+                      @let notesCount = task.notes.length;
                       @if (note) {
-                        <div class="text-sm text-slate-700">{{ note.userName || '—' }}</div>
+                        <div class="flex items-center gap-2">
+                          <div class="text-sm text-slate-700">{{ note.userName || '—' }}</div>
+                          <span
+                            class="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-slate-200 px-1.5 text-[10px] font-bold text-slate-700"
+                            [attr.aria-label]="'Notes count: ' + notesCount"
+                            title="Notes"
+                          >
+                            {{ notesCount }}
+                          </span>
+                        </div>
                         <div class="text-xs text-slate-500">{{ formatDateTime(note.createdAt) }}</div>
                       } @else {
-                        <span class="text-sm text-slate-400">—</span>
+                        <div class="flex items-center gap-2">
+                          <span class="text-sm text-slate-400">—</span>
+                          <span
+                            class="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-slate-100 px-1.5 text-[10px] font-bold text-slate-400"
+                            [attr.aria-label]="'Notes count: ' + notesCount"
+                            title="Notes"
+                          >
+                            {{ notesCount }}
+                          </span>
+                        </div>
                       }
                     </td>
                     <td class="px-6 py-4">
@@ -246,17 +271,24 @@
               </label>
 
               <label class="flex flex-col gap-2 text-sm text-slate-600">
-                <span class="font-semibold text-slate-800">Approver (Optional)</span>
+                <span class="font-semibold text-slate-800">Concerned people (Optional)</span>
                 <select
                   class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  [value]="taskForm().approver ?? ''"
-                  (change)="updateFormField('approver', $any($event.target).value || null)"
+                  multiple
+                  (change)="onConcernedUsersChange($event)"
                 >
-                  <option value="">No approver</option>
                   @for (user of filteredUsers(); track user._id) {
-                    <option [value]="user._id">{{ user.name }}</option>
+                    <option
+                      [value]="user._id"
+                      [selected]="taskForm().concernedUsers.includes(user._id)"
+                    >
+                      {{ user.name }}
+                    </option>
                   }
                 </select>
+                <span class="text-xs text-slate-500">
+                  Selected: {{ taskForm().concernedUsers.length }}
+                </span>
               </label>
 
               <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2">

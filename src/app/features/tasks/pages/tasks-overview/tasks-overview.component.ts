@@ -16,7 +16,7 @@ interface TaskFormState {
   description: string;
   type: TaskType | '';
   assignee: string;
-  approver: string | null;
+  concernedUsers: string[];
   notes: string;
   attachments: File[];
   isSaving: boolean;
@@ -204,6 +204,18 @@ export class TasksOverviewComponent implements OnInit {
     }));
   }
 
+  onConcernedUsersChange(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    const values = Array.from(select.selectedOptions)
+      .map((o) => o.value)
+      .filter((v) => !!v);
+    this.taskForm.update((state) => ({
+      ...state,
+      concernedUsers: values,
+      error: null,
+    }));
+  }
+
   saveTask(): void {
     const form = this.taskForm();
     if (!form.title.trim()) {
@@ -233,9 +245,7 @@ export class TasksOverviewComponent implements OnInit {
     formData.append('description', form.description || '');
     formData.append('type', form.type);
     formData.append('assignee', form.assignee);
-    if (form.approver) {
-      formData.append('approver', form.approver);
-    }
+    formData.append('concernedUsers', JSON.stringify(form.concernedUsers ?? []));
     if (form.notes && form.notes.trim()) {
       formData.append('notes', form.notes.trim());
     }
@@ -312,7 +322,7 @@ export class TasksOverviewComponent implements OnInit {
       description: '',
       type: '',
       assignee: '',
-      approver: null,
+      concernedUsers: [],
       notes: '',
       attachments: [],
       isSaving: false,

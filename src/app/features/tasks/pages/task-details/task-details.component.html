@@ -84,12 +84,14 @@
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned By</dt>
                 <dd class="mt-1 text-sm text-slate-900">{{ task()!.assignedName || '—' }}</dd>
               </div>
-              @if (task()!.approver) {
-                <div>
-                  <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Approver</dt>
-                  <dd class="mt-1 text-sm text-slate-900">{{ task()!.approverName || '—' }}</dd>
-                </div>
-              }
+              <div>
+                <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Concerned people</dt>
+                @if (task()!.concernedNames.length > 0) {
+                  <dd class="mt-1 text-sm text-slate-900">{{ task()!.concernedNames.join(', ') }}</dd>
+                } @else {
+                  <dd class="mt-1 text-sm text-slate-500">—</dd>
+                }
+              </div>
               <div>
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Created</dt>
                 <dd class="mt-1 text-sm text-slate-900">{{ formatDate(task()!.createdDate) }}</dd>

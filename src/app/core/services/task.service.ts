@@ -8,7 +8,6 @@ interface TaskQueryOptions {
   status?: 'open' | 'closed';
   assignee?: string;
   assigned?: string;
-  approver?: string;
   type?: string;
 }
 
@@ -25,7 +24,6 @@ export class TaskService {
     if (options.status) params = params.set('status', options.status);
     if (options.assignee) params = params.set('assignee', options.assignee);
     if (options.assigned) params = params.set('assigned', options.assigned);
-    if (options.approver) params = params.set('approver', options.approver);
     if (options.type) params = params.set('type', options.type);
 
     return this.http.get<Task[]>(this.baseUrl, { params });

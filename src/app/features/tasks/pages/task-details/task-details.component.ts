@@ -47,7 +47,7 @@ export class TaskDetailsComponent implements OnInit {
     return (
       task.assignee === userId ||
       task.assigned === userId ||
-      (task.approver && task.approver === userId)
+      (task.concernedUsers ?? []).includes(userId)
     );
   });
 
@@ -57,7 +57,7 @@ export class TaskDetailsComponent implements OnInit {
     if (!task || !userId || task.status === 'closed') {
       return false;
     }
-    return task.assignee === userId || (task.approver && task.approver === userId);
+    return task.assignee === userId || (task.concernedUsers ?? []).includes(userId);
   });
 
   readonly mediaBaseUrl = environment.apiUrl.replace('/api', '');
